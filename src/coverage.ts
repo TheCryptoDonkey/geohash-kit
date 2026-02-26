@@ -162,6 +162,11 @@ export function polygonToGeohashes(
   polygon: [number, number][],
   options: CoverageOptions = {},
 ): string[] {
+  // Guard: degenerate polygons
+  if (polygon.length < 3) {
+    throw new Error('Polygon must have at least 3 vertices')
+  }
+
   // Guard: antimeridian-crossing polygons are not supported
   for (let i = 0; i < polygon.length; i++) {
     const j = (i + 1) % polygon.length
@@ -184,8 +189,9 @@ export function polygonToGeohashes(
     if (result !== null && result.length <= maxCells) return result
   }
 
-  // Fallback: minPrecision with threshold=0
-  return computeGeohashes(polygon, minPrecision, minPrecision, 0) ?? []
+  // Fallback: minPrecision with threshold=0, then hard-cap to maxCells
+  const fallback = computeGeohashes(polygon, minPrecision, minPrecision, 0) ?? []
+  return fallback.slice(0, maxCells)
 }
 
 /**
@@ -272,12 +278,13 @@ function computeGeohashes(
 }
 
 /**
- * Post-processing merge: bottom-up consolidation of complete sibling sets.
- * When all 32 children of a parent are present, replace them with the parent.
- * This is safe because 32 children tile the parent perfectly — coverage is unchanged.
+ * Post-processing merge: bottom-up consolidation of near-complete sibling sets.
+ * When at least `minSiblings` (default 31) of 32 children of a parent are present,
+ * replace them with the parent. This trades a tiny boundary overshoot (at most one
+ * extra cell per merge) for a significantly smaller result array.
  * Iterates from finest to coarsest so merges can cascade.
  */
-function mergeCompleteSiblings(hashes: string[], minPrecision: number): string[] {
+function mergeCompleteSiblings(hashes: string[], minPrecision: number, minSiblings = 30): string[] {
   const set = new Set(hashes)
   let maxP = 0
   for (const h of set) {
@@ -294,8 +301,8 @@ function mergeCompleteSiblings(hashes: string[], minPrecision: number): string[]
     }
 
     for (const [parent, count] of parentCounts) {
-      if (count === 32) {
-        // All 32 siblings present — replace with parent
+      if (count >= minSiblings) {
+        // Near-complete or complete — replace children with parent
         for (const ch of geohashChildren(parent)) {
           set.delete(ch)
         }
