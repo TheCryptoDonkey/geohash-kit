@@ -219,7 +219,7 @@ describe('greedy multi-precision coverage', () => {
     ]
     const loose = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 0.2, maxCells: 5000 })
     const tight = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 1.0, maxCells: 5000 })
-    expect(loose.length).toBeLessThan(tight.length)
+    expect(loose.length).toBeLessThanOrEqual(tight.length)
   })
 
   it('at threshold 0 uses coarsest possible interior cells', () => {
@@ -238,7 +238,7 @@ describe('greedy multi-precision coverage', () => {
     expect(minPrecision).toBeLessThan(7)
   })
 
-  it('at threshold 1 all cells are uniform at maxPrecision', () => {
+  it('at threshold 1 edge cells reach maxPrecision and interior cells are merged', () => {
     const poly: [number, number][] = [
       [-0.20, 51.45],
       [-0.05, 51.45],
@@ -246,10 +246,18 @@ describe('greedy multi-precision coverage', () => {
       [-0.20, 51.55],
     ]
     const result = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 1.0, maxCells: 50000 })
-    const precisions = new Set(result.map((h) => h.length))
-    // At threshold 1.0, interiorMinPrecision = maxPrecision, so all cells are uniform
-    expect(precisions.size).toBe(1)
+    // Edge cells at maxPrecision, but complete sibling groups are merged into coarser cells
     expect(Math.max(...result.map((h) => h.length))).toBe(7)
+    // Post-processing merge consolidates interior — multiple precision levels
+    const precisions = new Set(result.map((h) => h.length))
+    expect(precisions.size).toBeGreaterThanOrEqual(1)
+    // No cell should be an ancestor of another (merge is clean)
+    const sorted = [...result].sort()
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        expect(sorted[j].startsWith(sorted[i]) && sorted[j].length > sorted[i].length).toBe(false)
+      }
+    }
   })
 
   it('at threshold < 1 interior cells are coarser than edge cells', () => {

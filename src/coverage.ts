@@ -252,7 +252,43 @@ function computeGeohashes(
     if (result.length > limit) return null
   }
 
-  return result.sort()
+  return mergeCompleteSiblings(result, minPrecision).sort()
+}
+
+/**
+ * Post-processing merge: bottom-up consolidation of complete sibling sets.
+ * When all 32 children of a parent are present, replace them with the parent.
+ * This is safe because 32 children tile the parent perfectly — coverage is unchanged.
+ * Iterates from finest to coarsest so merges can cascade.
+ */
+function mergeCompleteSiblings(hashes: string[], minPrecision: number): string[] {
+  const set = new Set(hashes)
+  let maxP = 0
+  for (const h of set) {
+    if (h.length > maxP) maxP = h.length
+  }
+
+  for (let p = maxP; p > minPrecision; p--) {
+    const parentCounts = new Map<string, number>()
+    for (const h of set) {
+      if (h.length === p) {
+        const parent = h.slice(0, -1)
+        parentCounts.set(parent, (parentCounts.get(parent) ?? 0) + 1)
+      }
+    }
+
+    for (const [parent, count] of parentCounts) {
+      if (count === 32) {
+        // All 32 siblings present — replace with parent
+        for (const ch of geohashChildren(parent)) {
+          set.delete(ch)
+        }
+        set.add(parent)
+      }
+    }
+  }
+
+  return Array.from(set)
 }
 
 function expandToDepth(hash: string, targetLength: number): string[] {
@@ -331,17 +367,23 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
 // --- deduplicateGeohashes ---
 
 /**
- * Remove redundant geohashes from a combined multi-precision set.
- * Any geohash whose ancestor (shorter prefix) is also in the set is redundant.
+ * Remove redundant geohashes and merge complete sibling groups.
+ * 1. Remove any geohash whose ancestor (shorter prefix) is already in the set.
+ * 2. Merge complete sibling sets (all 32 children → parent) bottom-up.
+ * Optimises for the smallest possible array.
  */
 export function deduplicateGeohashes(hashes: string[]): string[] {
+  // Step 1: remove children when ancestor is present
   const set = new Set(hashes)
-  return Array.from(set).filter((h) => {
+  const filtered = Array.from(set).filter((h) => {
     for (let len = 1; len < h.length; len++) {
       if (set.has(h.slice(0, len))) return false
     }
     return true
-  }).sort()
+  })
+
+  // Step 2: merge complete sibling groups bottom-up
+  return mergeCompleteSiblings(filtered, 1).sort()
 }
 
 // --- geohashesToGeoJSON ---
