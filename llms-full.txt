@@ -253,14 +253,16 @@ const hull = geohashesToConvexHull(['gcpvj', 'gcpvm', 'gcpvn'])
 // [[lon, lat], [lon, lat], ...] — convex hull vertices
 ```
 
-### deduplicateGeohashes(hashes)
+### deduplicateGeohashes(hashes, options?)
 
 Remove redundant ancestors from a multi-precision geohash set.
+Default mode merges only complete sibling sets (32/32). Pass `{ lossy: true }` to merge near-complete sets (≥30/32) for smaller output at the cost of slight boundary overshoot.
 
 ```typescript
-deduplicateGeohashes(hashes: string[]): string[]
+deduplicateGeohashes(hashes: string[], options?: DeduplicateOptions): string[]
 
 deduplicateGeohashes(['gcp', 'gcpvj', 'gcpvm', 'u10'])  // ['gcp', 'u10']
+deduplicateGeohashes(hashes, { lossy: true })  // more aggressive merging
 ```
 
 ### pointInPolygon(point, polygon)

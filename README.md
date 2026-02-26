@@ -9,9 +9,10 @@
 
 ## Why geohash-kit?
 
-- **Modern TypeScript** — native types, ESM-only, tree-shakeable subpath exports. A drop-in replacement for `ngeohash`.
-- **Polygon coverage** — adaptive threshold subdivision converts any polygon to a multi-precision geohash set. Not brute-force.
-- **Nostr filters** — the first library that generates correct multi-precision `g`-tag ladders for publishing and `#g` filter arrays for REQ subscriptions.
+- **Modern TypeScript** — native types, ESM-only, tree-shakeable subpath exports. Zero dependencies. A drop-in replacement for `ngeohash`.
+- **Smart polygon coverage** — adaptive multi-precision subdivision produces compact geohash sets (coarse interior, fine edges). Other polygon libraries use single-precision brute-force, producing 10-100x more cells for the same area.
+- **Production-hardened** — input validation on all public APIs, RangeError on invalid/infeasible parameters, 717 tests including fuzz and property-based suites.
+- **Nostr-native** — the only library that generates correct multi-precision `g`-tag ladders for publishing and `#g` filter arrays for REQ subscriptions.
 
 ## Install
 
@@ -153,18 +154,24 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 
 ## Comparison
 
-| Feature | geohash-kit | ngeohash | geohashing | geohash-poly | nostr-geotags |
-|---------|-------------|----------|------------|--------------|---------------|
-| TypeScript native | Yes | No | Yes | No | Yes |
-| ESM-only | Yes | No | Yes | No | Yes |
-| Polygon coverage | Adaptive | No | No | Brute-force | No |
-| GeoJSON output | Yes | No | Yes | No | No |
-| Convex hull | Yes | No | No | No | No |
-| Distance utils | Yes | No | No | No | No |
-| Nostr g-tag ladders | Yes | No | No | No | Partial |
-| Nostr REQ filters | Yes | No | No | No | No |
-| Ring expansion | Yes | No | No | No | No |
-| Zero dependencies | Yes | Yes | Yes | No | Yes |
+| Feature | geohash-kit | ngeohash | geohashing | latlon-geohash | geohash-poly | shape2geohash | nostr-geotags |
+|---------|:-----------:|:--------:|:----------:|:--------------:|:------------:|:-------------:|:-------------:|
+| TypeScript native | **Yes** | No | Yes | No | No | No | Yes |
+| ESM-only | **Yes** | No | Yes | No | No | No | Yes |
+| Zero dependencies | **Yes** | Yes | Yes | Yes | No (10) | No (11) | No (2) |
+| Polygon → geohashes | **Multi-precision** | — | — | — | Single-precision | Single-precision | — |
+| Multi-precision output | **Yes** | — | — | — | No | No | — |
+| maxCells budget | **Yes** | — | — | — | No | No | — |
+| GeoJSON output | **Yes** | No | Yes | No | No | No | No |
+| Convex hull | **Yes** | No | No | No | No | No | No |
+| Deduplication | **Yes** | No | No | No | No | No | No |
+| Distance / radius | **Yes** | No | No | No | No | No | No |
+| Neighbours / rings | **Yes** | Yes | No | Yes | No | No | No |
+| Nostr g-tag ladders | **Yes** | No | No | No | No | No | Partial |
+| Nostr REQ filters | **Yes** | No | No | No | No | No | No |
+| Input validation | **Yes** | No | No | No | No | No | No |
+| Last published | 2026 | 2022 | 2024 | 2022 | 2022 | 2022 | 2025 |
+| Weekly downloads | — | ~171k | ~2k | ~19k | ~1k | ~1k | <100 |
 
 ## For AI Assistants
 
