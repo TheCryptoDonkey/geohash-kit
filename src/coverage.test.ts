@@ -1,0 +1,361 @@
+import { describe, it, expect } from 'vitest'
+import { bounds, decode } from './core.js'
+import {
+  pointInPolygon, boundsOverlapsPolygon, boundsFullyInsidePolygon,
+  polygonToGeohashes, geohashesToGeoJSON, geohashesToConvexHull,
+  deduplicateGeohashes,
+} from './coverage.js'
+import type { GeohashBounds } from './core.js'
+
+describe('pointInPolygon', () => {
+  const square: [number, number][] = [[0, 0], [10, 0], [10, 10], [0, 10]]
+
+  it('returns true for a point inside', () => {
+    expect(pointInPolygon([5, 5], square)).toBe(true)
+  })
+
+  it('returns false for a point outside', () => {
+    expect(pointInPolygon([15, 5], square)).toBe(false)
+  })
+
+  it('returns true for a point on the edge', () => {
+    expect(pointInPolygon([5, 0], square)).toBe(true)
+  })
+
+  it('returns false for a point far outside', () => {
+    expect(pointInPolygon([-5, -5], square)).toBe(false)
+  })
+
+  it('works with a triangle', () => {
+    const triangle: [number, number][] = [[0, 0], [10, 0], [5, 10]]
+    expect(pointInPolygon([5, 3], triangle)).toBe(true)
+    expect(pointInPolygon([1, 9], triangle)).toBe(false)
+  })
+})
+
+describe('boundsOverlapsPolygon', () => {
+  const poly: [number, number][] = [[2, 2], [8, 2], [8, 8], [2, 8]]
+
+  it('returns true when bounds overlap polygon', () => {
+    const b: GeohashBounds = { minLat: 1, maxLat: 4, minLon: 1, maxLon: 4 }
+    expect(boundsOverlapsPolygon(b, poly)).toBe(true)
+  })
+
+  it('returns true when bounds fully inside polygon', () => {
+    const b: GeohashBounds = { minLat: 3, maxLat: 5, minLon: 3, maxLon: 5 }
+    expect(boundsOverlapsPolygon(b, poly)).toBe(true)
+  })
+
+  it('returns false when bounds fully outside polygon', () => {
+    const b: GeohashBounds = { minLat: 10, maxLat: 15, minLon: 10, maxLon: 15 }
+    expect(boundsOverlapsPolygon(b, poly)).toBe(false)
+  })
+
+  it('returns true when polygon is fully inside bounds', () => {
+    const b: GeohashBounds = { minLat: 0, maxLat: 10, minLon: 0, maxLon: 10 }
+    expect(boundsOverlapsPolygon(b, poly)).toBe(true)
+  })
+})
+
+describe('boundsFullyInsidePolygon', () => {
+  const poly: [number, number][] = [[0, 0], [10, 0], [10, 10], [0, 10]]
+
+  it('returns true when all corners inside polygon', () => {
+    const b: GeohashBounds = { minLat: 2, maxLat: 8, minLon: 2, maxLon: 8 }
+    expect(boundsFullyInsidePolygon(b, poly)).toBe(true)
+  })
+
+  it('returns false when some corners outside polygon', () => {
+    const b: GeohashBounds = { minLat: -1, maxLat: 5, minLon: 2, maxLon: 8 }
+    expect(boundsFullyInsidePolygon(b, poly)).toBe(false)
+  })
+})
+
+describe('polygonToGeohashes', () => {
+  it('returns geohashes covering a small area', () => {
+    // Small polygon around central London (~2km square)
+    const london: [number, number][] = [
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ]
+    const result = polygonToGeohashes(london)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result.length).toBeLessThan(300)
+    // All should be valid geohash strings
+    for (const h of result) {
+      expect(h).toMatch(/^[0-9b-hjkmnp-z]+$/)
+      expect(h.length).toBeGreaterThanOrEqual(1)
+      expect(h.length).toBeLessThanOrEqual(9)
+    }
+  })
+
+  it('returns no duplicates', () => {
+    const poly: [number, number][] = [
+      [-0.2, 51.48],
+      [-0.05, 51.48],
+      [-0.05, 51.55],
+      [-0.2, 51.55],
+    ]
+    const result = polygonToGeohashes(poly)
+    expect(new Set(result).size).toBe(result.length)
+  })
+
+  it('uses coarser geohashes for large areas', () => {
+    // Large polygon covering most of southern England
+    const large: [number, number][] = [
+      [-2.0, 50.5],
+      [1.0, 50.5],
+      [1.0, 52.0],
+      [-2.0, 52.0],
+    ]
+    const result = polygonToGeohashes(large)
+    // Should include some precision-4 or precision-3 cells
+    const minPrecision = Math.min(...result.map((h) => h.length))
+    expect(minPrecision).toBeLessThanOrEqual(5)
+  })
+
+  it('respects maxCells cap', () => {
+    const big: [number, number][] = [
+      [-6.0, 49.0],
+      [2.0, 49.0],
+      [2.0, 56.0],
+      [-6.0, 56.0],
+    ]
+    const result = polygonToGeohashes(big, { maxCells: 50 })
+    expect(result.length).toBeLessThanOrEqual(50)
+  })
+
+  it('returns empty array for tiny polygon outside valid area', () => {
+    const nowhere: [number, number][] = [
+      [200, 100],
+      [201, 100],
+      [201, 101],
+    ]
+    const result = polygonToGeohashes(nowhere)
+    expect(result).toEqual([])
+  })
+
+  it('defaults to minPrecision 1 and maxPrecision 9', () => {
+    // Very small area should produce precision-9 cells
+    const tiny: [number, number][] = [
+      [-0.1280, 51.5073],
+      [-0.1275, 51.5073],
+      [-0.1275, 51.5076],
+      [-0.1280, 51.5076],
+    ]
+    const result = polygonToGeohashes(tiny)
+    const maxLen = Math.max(...result.map((h) => h.length))
+    expect(maxLen).toBeGreaterThanOrEqual(7)
+  })
+
+  it('can produce precision-1 cells for huge areas', () => {
+    const huge: [number, number][] = [
+      [-180, -90],
+      [180, -90],
+      [180, 90],
+      [-180, 90],
+    ]
+    const result = polygonToGeohashes(huge, { maxCells: 32 })
+    const minLen = Math.min(...result.map((h) => h.length))
+    expect(minLen).toBe(1)
+  })
+})
+
+describe('polygonToGeohashes mergeThreshold', () => {
+  // A polygon that produces edge cells at max precision
+  const london: [number, number][] = [
+    [-0.15, 51.50],
+    [-0.10, 51.50],
+    [-0.10, 51.52],
+    [-0.15, 51.52],
+  ]
+
+  it('threshold 1.0 matches default (strict merge)', () => {
+    const strict = polygonToGeohashes(london)
+    const explicit = polygonToGeohashes(london, { mergeThreshold: 1.0 })
+    expect(explicit).toEqual(strict)
+  })
+
+  it('threshold < 1.0 produces fewer or equal cells at same precision', () => {
+    // Pin the same precision range so only the merge behaviour differs
+    const opts = { minPrecision: 3, maxPrecision: 6, maxCells: 10000 }
+    const strict = polygonToGeohashes(london, { ...opts, mergeThreshold: 1.0 })
+    const relaxed = polygonToGeohashes(london, { ...opts, mergeThreshold: 0.7 })
+    expect(relaxed.length).toBeLessThanOrEqual(strict.length)
+  })
+
+  it('threshold 0.7 merges when 23+ of 32 children present', () => {
+    const relaxed = polygonToGeohashes(london, { mergeThreshold: 0.7 })
+    // Should have more coarse-precision cells than strict
+    const coarseCount = relaxed.filter((h) => h.length <= 4).length
+    const strictCoarse = polygonToGeohashes(london).filter((h) => h.length <= 4).length
+    expect(coarseCount).toBeGreaterThanOrEqual(strictCoarse)
+  })
+})
+
+describe('greedy multi-precision coverage', () => {
+  it('produces 3+ precision levels for a medium-large polygon', () => {
+    // East Midlands — roughly 2.5° × 1.5° polygon
+    const midlands: [number, number][] = [
+      [-2.0, 52.2],
+      [0.3, 52.2],
+      [0.3, 53.5],
+      [-2.0, 53.5],
+    ]
+    const result = polygonToGeohashes(midlands, { mergeThreshold: 0.5 })
+    const precisions = new Set(result.map((h) => h.length))
+    expect(precisions.size).toBeGreaterThanOrEqual(3)
+  })
+
+  it('uses coarse cells in the interior and fine cells at edges', () => {
+    const large: [number, number][] = [
+      [-2.0, 50.5],
+      [1.0, 50.5],
+      [1.0, 52.5],
+      [-2.0, 52.5],
+    ]
+    const result = polygonToGeohashes(large, { mergeThreshold: 0.5 })
+    const precisions = new Set(result.map((h) => h.length))
+    const minPrecision = Math.min(...result.map((h) => h.length))
+    expect(minPrecision).toBeLessThanOrEqual(3)
+    expect(precisions.size).toBeGreaterThanOrEqual(2)
+    expect(result.length).toBeLessThanOrEqual(500)
+  })
+
+  it('no geohash is an ancestor of another', () => {
+    const poly: [number, number][] = [
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ]
+    const result = polygonToGeohashes(poly, { mergeThreshold: 0.7 })
+    const sorted = [...result].sort()
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (sorted[j].startsWith(sorted[i]) && sorted[j].length > sorted[i].length) {
+          throw new Error(`${sorted[i]} is an ancestor of ${sorted[j]}`)
+        }
+      }
+    }
+  })
+
+  it('auto-tightens threshold when result exceeds maxCells', () => {
+    const large: [number, number][] = [
+      [-6.0, 49.5],
+      [2.0, 49.5],
+      [2.0, 59.0],
+      [-6.0, 59.0],
+    ]
+    // With threshold 1.0 and maxPrecision 9, the raw count far exceeds 100,
+    // so the algorithm should auto-tighten to fit within maxCells.
+    const result = polygonToGeohashes(large, { mergeThreshold: 1.0, maxCells: 100 })
+    expect(result.length).toBeLessThanOrEqual(100)
+    expect(result.length).toBeGreaterThan(0)
+  })
+})
+
+describe('geohashesToGeoJSON', () => {
+  it('converts geohashes to a GeoJSON FeatureCollection of polygons', () => {
+    const result = geohashesToGeoJSON(['gcpvj', 'gcpvm'])
+    expect(result.type).toBe('FeatureCollection')
+    expect(result.features).toHaveLength(2)
+    expect(result.features[0].geometry.type).toBe('Polygon')
+    expect(result.features[0].properties.geohash).toBe('gcpvj')
+    expect(result.features[0].properties.precision).toBe(5)
+  })
+
+  it('each polygon has 5 coordinates (closed ring)', () => {
+    const result = geohashesToGeoJSON(['gcp'])
+    const coords = result.features[0].geometry.coordinates[0]
+    expect(coords).toHaveLength(5)
+    expect(coords[0]).toEqual(coords[4])
+  })
+
+  it('returns empty collection for empty input', () => {
+    const result = geohashesToGeoJSON([])
+    expect(result.features).toHaveLength(0)
+  })
+})
+
+describe('geohashesToConvexHull', () => {
+  it('returns empty array for empty input', () => {
+    expect(geohashesToConvexHull([])).toEqual([])
+  })
+
+  it('returns 4+ vertex polygon for a single geohash', () => {
+    const hull = geohashesToConvexHull(['gcpvj'])
+    expect(hull.length).toBeGreaterThanOrEqual(4)
+    // Should form a rectangle (4 corners of the cell)
+    const lons = hull.map((v) => v[0])
+    const lats = hull.map((v) => v[1])
+    expect(Math.min(...lons)).toBeLessThan(Math.max(...lons))
+    expect(Math.min(...lats)).toBeLessThan(Math.max(...lats))
+  })
+
+  it('returns valid convex polygon for multiple geohashes', () => {
+    const hashes = polygonToGeohashes([
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ])
+    const hull = geohashesToConvexHull(hashes)
+    expect(hull.length).toBeGreaterThanOrEqual(4)
+
+    // Verify convexity: all cross products should have the same sign
+    for (let i = 0; i < hull.length; i++) {
+      const a = hull[i]
+      const b = hull[(i + 1) % hull.length]
+      const c = hull[(i + 2) % hull.length]
+      const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+      expect(cross).toBeGreaterThanOrEqual(0) // counter-clockwise or collinear
+    }
+  })
+
+  it('hull contains all original geohash centres', () => {
+    const hashes = ['gcpvj', 'gcpvm', 'gcpvn']
+    const hull = geohashesToConvexHull(hashes)
+
+    for (const hash of hashes) {
+      const b = bounds(hash)
+      const centre: [number, number] = [(b.minLon + b.maxLon) / 2, (b.minLat + b.maxLat) / 2]
+      expect(pointInPolygon(centre, hull)).toBe(true)
+    }
+  })
+
+  it('produced polygon is consumable by polygonToGeohashes (round-trip)', () => {
+    const original = polygonToGeohashes([
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ])
+    const hull = geohashesToConvexHull(original)
+    expect(hull.length).toBeGreaterThanOrEqual(3)
+
+    // The hull is a convex approximation — the round-trip may use
+    // different precision levels due to auto-tightening, but it should
+    // produce a valid non-empty result covering the same general area.
+    const roundTrip = polygonToGeohashes(hull)
+    expect(roundTrip.length).toBeGreaterThan(0)
+  })
+})
+
+describe('deduplicateGeohashes', () => {
+  it('removes children when parent is present', () => {
+    const result = deduplicateGeohashes(['gcp', 'gcpvj', 'gcpvm', 'u10'])
+    expect(result).toEqual(['gcp', 'u10'])
+  })
+
+  it('returns empty array for empty input', () => {
+    expect(deduplicateGeohashes([])).toEqual([])
+  })
+
+  it('returns same array when no ancestors present', () => {
+    const result = deduplicateGeohashes(['gcpvj', 'gcpvm', 'u10hf'])
+    expect(result).toEqual(['gcpvj', 'gcpvm', 'u10hf'])
+  })
+})

@@ -4,3 +4,10 @@ export {
   distance, distanceFromCoords, radiusToPrecision, precisionToRadius,
   type GeohashBounds, type Direction,
 } from './core.js'
+
+export {
+  pointInPolygon, boundsOverlapsPolygon, boundsFullyInsidePolygon,
+  polygonToGeohashes, geohashesToGeoJSON, geohashesToConvexHull,
+  deduplicateGeohashes,
+  type CoverageOptions, type GeohashGeoJSON,
+} from './coverage.js'
