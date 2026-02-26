@@ -92,3 +92,48 @@ export function contains(a: string, b: string): boolean {
 export function matchesAny(hash: string, candidates: string[]): boolean {
   return candidates.some(c => contains(hash, c))
 }
+
+// --- Neighbours ---
+
+/** Get a single adjacent geohash cell in the given direction. */
+export function neighbour(hash: string, direction: Direction): string {
+  const b = bounds(hash)
+  const latHeight = b.maxLat - b.minLat
+  const lonWidth = b.maxLon - b.minLon
+  const centreLat = (b.minLat + b.maxLat) / 2
+  const centreLon = (b.minLon + b.maxLon) / 2
+
+  let dLat = 0
+  let dLon = 0
+
+  if (direction.includes('n')) dLat = latHeight
+  if (direction.includes('s')) dLat = -latHeight
+  if (direction.includes('e')) dLon = lonWidth
+  if (direction.includes('w')) dLon = -lonWidth
+
+  let newLat = centreLat + dLat
+  let newLon = centreLon + dLon
+
+  // Wrap longitude around the antimeridian
+  if (newLon > 180) newLon -= 360
+  if (newLon < -180) newLon += 360
+
+  // Clamp latitude at poles (no wrapping)
+  newLat = Math.max(-89.99999, Math.min(89.99999, newLat))
+
+  return encode(newLat, newLon, hash.length)
+}
+
+/** Get all 8 adjacent geohash cells. */
+export function neighbours(hash: string): Record<Direction, string> {
+  return {
+    n: neighbour(hash, 'n'),
+    ne: neighbour(hash, 'ne'),
+    e: neighbour(hash, 'e'),
+    se: neighbour(hash, 'se'),
+    s: neighbour(hash, 's'),
+    sw: neighbour(hash, 'sw'),
+    w: neighbour(hash, 'w'),
+    nw: neighbour(hash, 'nw'),
+  }
+}

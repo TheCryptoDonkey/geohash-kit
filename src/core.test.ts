@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   encode, decode, bounds, children, contains, matchesAny,
+  neighbour, neighbours,
   type GeohashBounds,
 } from './core.js'
 
@@ -153,5 +154,69 @@ describe('matchesAny', () => {
 
   it('handles empty candidates list', () => {
     expect(matchesAny('gcvdn', [])).toBe(false)
+  })
+})
+
+describe('neighbour', () => {
+  it('returns the north neighbour of gcpvj', () => {
+    const n = neighbour('gcpvj', 'n')
+    expect(n.length).toBe(5)
+    expect(n).not.toBe('gcpvj')
+    // North neighbour's south boundary should equal gcpvj's north boundary
+    const original = bounds('gcpvj')
+    const adj = bounds(n)
+    expect(adj.minLat).toBeCloseTo(original.maxLat, 10)
+  })
+
+  it('returns the east neighbour of gcpvj', () => {
+    const e = neighbour('gcpvj', 'e')
+    const original = bounds('gcpvj')
+    const adj = bounds(e)
+    expect(adj.minLon).toBeCloseTo(original.maxLon, 10)
+  })
+
+  it('handles precision 1', () => {
+    const n = neighbour('s', 'n')
+    expect(n.length).toBe(1)
+    expect(n).not.toBe('s')
+  })
+
+  it('handles antimeridian wrapping (east of z-column)', () => {
+    // A geohash near lon 180 should wrap to near lon -180
+    const hash = encode(0, 179.99, 3)
+    const e = neighbour(hash, 'e')
+    const eBounds = bounds(e)
+    // The east neighbour should be near -180 (wrapped)
+    expect(eBounds.minLon).toBeLessThan(-170)
+  })
+})
+
+describe('neighbours', () => {
+  it('returns 8 distinct neighbours', () => {
+    const n = neighbours('gcpvj')
+    const values = Object.values(n)
+    expect(values).toHaveLength(8)
+    expect(new Set(values).size).toBe(8)
+    // None should be the original hash
+    expect(values).not.toContain('gcpvj')
+  })
+
+  it('has correct keys', () => {
+    const n = neighbours('gcpvj')
+    expect(Object.keys(n).sort()).toEqual(['e', 'n', 'ne', 'nw', 's', 'se', 'sw', 'w'])
+  })
+
+  it('north neighbour bounds are adjacent', () => {
+    const n = neighbours('gcpvj')
+    const original = bounds('gcpvj')
+    const northBounds = bounds(n.n)
+    expect(northBounds.minLat).toBeCloseTo(original.maxLat, 10)
+  })
+
+  it('all neighbours have the same precision', () => {
+    const n = neighbours('gcpvj')
+    for (const v of Object.values(n)) {
+      expect(v.length).toBe(5)
+    }
   })
 })
