@@ -1,0 +1,61 @@
+{
+  "name": "geohash-kit",
+  "version": "1.0.0",
+  "description": "Modern TypeScript geohash toolkit — encode, decode, cover polygons, and build Nostr filters",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./coverage": {
+      "types": "./dist/coverage.d.ts",
+      "default": "./dist/coverage.js"
+    },
+    "./nostr": {
+      "types": "./dist/nostr.d.ts",
+      "default": "./dist/nostr.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "geohash",
+    "geospatial",
+    "nostr",
+    "polygon",
+    "coverage",
+    "typescript",
+    "esm",
+    "g-tag",
+    "proximity",
+    "location",
+    "gis",
+    "spatial-index"
+  ],
+  "author": "TheCryptoDonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheCryptoDonkey/geohash-kit.git"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "files": [
+    "dist",
+    "llms.txt",
+    "llms-full.txt"
+  ]
+}
