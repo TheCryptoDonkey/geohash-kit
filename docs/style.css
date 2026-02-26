@@ -1,0 +1,232 @@
+/* --- Reset & base --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1a2e;
+  --bg-panel: #16213e;
+  --bg-code: #0f0f23;
+  --text: #e0e0e0;
+  --text-dim: #8888aa;
+  --accent: #4fc3f7;
+  --accent-hover: #81d4fa;
+  --border: #2a2a4a;
+  --tab-active: #4fc3f7;
+  --tab-inactive: #3a3a5a;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
+
+/* --- Header --- */
+header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header-left h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.tagline {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.header-links {
+  margin-left: auto;
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+/* --- Tabs --- */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tab {
+  background: var(--tab-inactive);
+  color: var(--text);
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: var(--font);
+  transition: background 0.15s;
+}
+
+.tab:hover { background: var(--border); }
+.tab.active { background: var(--tab-active); color: #111; font-weight: 600; }
+
+/* --- Main layout --- */
+main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#map {
+  flex: 7;
+  min-width: 0;
+}
+
+aside#panel {
+  flex: 3;
+  min-width: 280px;
+  max-width: 400px;
+  overflow-y: auto;
+  padding: 1rem;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+/* --- Panel content --- */
+.panel-content h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+}
+
+.field {
+  margin-bottom: 0.75rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+/* --- Code blocks --- */
+.code-block {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 0.5rem;
+  color: var(--text);
+}
+
+.code-block .str { color: #a5d6a7; }
+.code-block .num { color: #ffcc80; }
+.code-block .kw { color: #ce93d8; }
+.code-block .fn { color: #81d4fa; }
+
+/* --- Controls --- */
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+input[type="number"] {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+select {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.btn {
+  background: var(--tab-inactive);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.btn:hover { background: var(--border); }
+
+/* --- Footer --- */
+footer {
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* --- Utility --- */
+.hidden { display: none !important; }
+
+/* --- Responsive (mobile: stack vertically) --- */
+@media (max-width: 768px) {
+  header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  main {
+    flex-direction: column;
+  }
+
+  #map {
+    flex: none;
+    height: 50vh;
+  }
+
+  aside#panel {
+    flex: none;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
