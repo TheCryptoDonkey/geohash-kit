@@ -1,0 +1,74 @@
+# geohash-kit
+
+> Modern TypeScript geohash toolkit — encode, decode, cover polygons, and build Nostr filters.
+
+Zero dependencies. ESM-only. Three subpath exports.
+
+## Install
+
+npm install geohash-kit
+
+## Subpath Exports
+
+### geohash-kit/core
+Basic geohash operations: encode, decode, bounds, neighbours, distance.
+
+- encode(lat, lon, precision?) → geohash string
+- decode(hash) → { lat, lon, error }
+- bounds(hash) → { minLat, maxLat, minLon, maxLon }
+- neighbours(hash) → { n, ne, e, se, s, sw, w, nw }
+- neighbour(hash, direction) → adjacent hash
+- children(hash) → 32 child hashes
+- contains(a, b) → boolean (prefix containment)
+- matchesAny(hash, candidates) → boolean
+- distance(hashA, hashB) → metres
+- distanceFromCoords(lat1, lon1, lat2, lon2) → metres
+- radiusToPrecision(metres) → precision level (1-9)
+- precisionToRadius(precision) → metres
+
+### geohash-kit/coverage
+Polygon-to-geohash coverage with adaptive threshold subdivision.
+
+- polygonToGeohashes(polygon, options?) → multi-precision hash set
+- geohashesToGeoJSON(hashes) → GeoJSON FeatureCollection
+- geohashesToConvexHull(hashes) → polygon vertices
+- deduplicateGeohashes(hashes) → ancestor-free set
+- pointInPolygon(point, polygon) → boolean
+- boundsOverlapsPolygon(bounds, polygon) → boolean
+- boundsFullyInsidePolygon(bounds, polygon) → boolean
+
+### geohash-kit/nostr
+Nostr-specific g-tag utilities for event publishing and relay subscription.
+
+- createGTagLadder(geohash, minPrecision?) → string[][] (event tags)
+- createGTagFilter(lat, lon, radiusMetres) → { "#g": string[] }
+- createGTagFilterFromGeohashes(hashes) → { "#g": string[] }
+- expandRings(hash, rings?) → string[][] (concentric neighbour rings)
+- nearbyFilter(lat, lon, options?) → { "#g": string[] }
+- parseGTags(tags) → { geohash, precision }[]
+- bestGeohash(tags) → string | undefined
+
+## Quick Examples
+
+```typescript
+import { encode, neighbours, polygonToGeohashes, createGTagLadder, createGTagFilter } from 'geohash-kit'
+
+// Encode a location
+const hash = encode(51.5074, -0.1278) // 'gcpvj'
+
+// Get adjacent cells
+const adj = neighbours(hash) // { n: '...', ne: '...', ... }
+
+// Cover a polygon with geohashes
+const coverage = polygonToGeohashes([[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52]])
+
+// Generate Nostr event tags
+const tags = createGTagLadder(hash) // [['g','g'], ['g','gc'], ['g','gcp'], ['g','gcpv'], ['g','gcpvj']]
+
+// Generate Nostr subscription filter
+const filter = createGTagFilter(51.5074, -0.1278, 5000) // { '#g': ['gcpvj', 'gcpvm', ...] }
+```
+
+## Optional
+
+- llms-full.txt: Full API reference with all type signatures

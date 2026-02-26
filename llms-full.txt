@@ -1,0 +1,425 @@
+# geohash-kit — Full API Reference
+
+> Modern TypeScript geohash toolkit — encode, decode, cover polygons, and build Nostr filters.
+
+Zero dependencies. ESM-only. TypeScript native.
+
+Repository: https://github.com/TheCryptoDonkey/geohash-kit
+Licence: MIT
+
+## Install
+
+```
+npm install geohash-kit
+```
+
+## Imports
+
+```typescript
+// Barrel (everything)
+import { encode, polygonToGeohashes, createGTagLadder } from 'geohash-kit'
+
+// Subpath (tree-shakeable)
+import { encode, decode, bounds } from 'geohash-kit/core'
+import { polygonToGeohashes } from 'geohash-kit/coverage'
+import { createGTagLadder } from 'geohash-kit/nostr'
+```
+
+---
+
+## Types
+
+```typescript
+interface GeohashBounds {
+  minLat: number
+  maxLat: number
+  minLon: number
+  maxLon: number
+}
+
+type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+
+interface CoverageOptions {
+  minPrecision?: number    // default 1 — coarsest exploration level
+  maxPrecision?: number    // default 9 — finest exploration level
+  maxCells?: number        // default 500 — hard cap, triggers threshold tightening
+  mergeThreshold?: number  // default 1.0 — fraction of children to merge parent (0–1)
+}
+
+interface GeohashGeoJSON {
+  type: 'FeatureCollection'
+  features: Array<{
+    type: 'Feature'
+    geometry: { type: 'Polygon'; coordinates: [number, number][][] }
+    properties: { geohash: string; precision: number }
+  }>
+}
+```
+
+---
+
+## geohash-kit/core
+
+### encode(lat, lon, precision?)
+
+Encode latitude/longitude to a geohash string. Default precision 5 (~4.9km).
+
+```typescript
+encode(lat: number, lon: number, precision?: number): string
+
+encode(51.5074, -0.1278)     // 'gcpvj'
+encode(51.5074, -0.1278, 7)  // 'gcpvjbs'
+encode(0, 0, 5)              // 's0000'
+```
+
+### decode(hash)
+
+Decode a geohash to its centre point with error margins.
+
+```typescript
+decode(hash: string): { lat: number; lon: number; error: { lat: number; lon: number } }
+
+decode('gcpvj')  // { lat: 51.51, lon: -0.13, error: { lat: 0.02, lon: 0.02 } }
+```
+
+### bounds(hash)
+
+Get the bounding rectangle of a geohash cell.
+
+```typescript
+bounds(hash: string): GeohashBounds
+
+bounds('gcpvj')  // { minLat: 51.50, maxLat: 51.52, minLon: -0.15, maxLon: -0.10 }
+bounds('')       // { minLat: -90, maxLat: 90, minLon: -180, maxLon: 180 }
+```
+
+### children(hash)
+
+Get the 32 children of a geohash at the next precision level.
+
+```typescript
+children(hash: string): string[]
+
+children('g')   // ['g0', 'g1', ..., 'gz'] (32 entries)
+children('')    // ['0', '1', ..., 'z'] (32 top-level cells)
+```
+
+### neighbour(hash, direction)
+
+Get a single adjacent geohash cell in the given direction.
+
+```typescript
+neighbour(hash: string, direction: Direction): string
+
+neighbour('gcpvj', 'n')   // north neighbour at same precision
+neighbour('gcpvj', 'ne')  // north-east neighbour
+```
+
+### neighbours(hash)
+
+Get all 8 adjacent geohash cells.
+
+```typescript
+neighbours(hash: string): Record<Direction, string>
+
+neighbours('gcpvj')  // { n: '...', ne: '...', e: '...', se: '...', s: '...', sw: '...', w: '...', nw: '...' }
+```
+
+### contains(a, b)
+
+Check if two geohashes overlap (bidirectional prefix containment).
+
+```typescript
+contains(a: string, b: string): boolean
+
+contains('gcvd', 'gcvdn')   // true (gcvd contains gcvdn)
+contains('gcvdn', 'gcvd')   // true (gcvd contains gcvdn)
+contains('gcvdn', 'gcvdp')  // false (siblings)
+```
+
+### matchesAny(hash, candidates)
+
+Check if a geohash matches any candidate in a multi-precision set.
+
+```typescript
+matchesAny(hash: string, candidates: string[]): boolean
+
+matchesAny('gcvdn', ['gcpvj', 'gcvd', 'u10h'])  // true (gcvd is prefix)
+matchesAny('gcvdn', ['gcpvj', 'u10h'])           // false
+```
+
+### distance(hashA, hashB)
+
+Haversine distance in metres between centres of two geohash cells.
+
+```typescript
+distance(hashA: string, hashB: string): number
+
+distance('gcpvj', 'u09tu')  // ~340000 (London to Paris)
+distance('gcpvj', 'gcpvj')  // 0
+```
+
+### distanceFromCoords(lat1, lon1, lat2, lon2)
+
+Haversine distance in metres between two coordinate pairs.
+
+```typescript
+distanceFromCoords(lat1: number, lon1: number, lat2: number, lon2: number): number
+
+distanceFromCoords(51.5074, -0.1278, 48.8566, 2.3522)  // ~340000
+```
+
+### radiusToPrecision(metres)
+
+Optimal geohash precision for a given search radius in metres.
+
+```typescript
+radiusToPrecision(metres: number): number
+
+radiusToPrecision(5_000_000)  // 1
+radiusToPrecision(2_500)      // 5
+radiusToPrecision(80)         // 7
+radiusToPrecision(2)          // 9
+```
+
+### precisionToRadius(precision)
+
+Approximate cell radius in metres for a given precision level.
+
+```typescript
+precisionToRadius(precision: number): number
+
+precisionToRadius(1)  // 2_500_000
+precisionToRadius(5)  // 2_400
+precisionToRadius(9)  // 2.4
+```
+
+Precision table:
+
+| Precision | Cell width | Cell height | Approx. radius |
+|-----------|-----------|-------------|----------------|
+| 1 | ~5,000 km | ~5,000 km | ~2,500 km |
+| 2 | ~1,250 km | ~625 km | ~630 km |
+| 3 | ~156 km | ~156 km | ~78 km |
+| 4 | ~39.1 km | ~19.5 km | ~20 km |
+| 5 | ~4.89 km | ~4.89 km | ~2.4 km |
+| 6 | ~1.22 km | ~0.61 km | ~610 m |
+| 7 | ~153 m | ~153 m | ~76 m |
+| 8 | ~38.2 m | ~19.1 m | ~19 m |
+| 9 | ~4.77 m | ~4.77 m | ~2.4 m |
+
+---
+
+## geohash-kit/coverage
+
+### polygonToGeohashes(polygon, options?)
+
+Convert a polygon to a set of covering geohashes at variable precision.
+Uses adaptive threshold recursive subdivision with automatic threshold
+tightening to respect maxCells budget.
+
+```typescript
+polygonToGeohashes(
+  polygon: [number, number][],   // [lon, lat] vertices
+  options?: CoverageOptions
+): string[]
+
+// Cover central London
+polygonToGeohashes([[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52]])
+
+// With options
+polygonToGeohashes(polygon, { maxCells: 100, mergeThreshold: 0.7 })
+```
+
+### geohashesToGeoJSON(hashes)
+
+Convert geohash set to GeoJSON FeatureCollection for map rendering.
+
+```typescript
+geohashesToGeoJSON(hashes: string[]): GeohashGeoJSON
+
+const geojson = geohashesToGeoJSON(['gcpvj', 'gcpvm'])
+// { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', ... }, properties: { geohash: 'gcpvj', precision: 5 } }, ...] }
+```
+
+### geohashesToConvexHull(hashes)
+
+Reconstruct a convex polygon from a geohash set (Andrew's monotone chain).
+
+```typescript
+geohashesToConvexHull(hashes: string[]): [number, number][]
+
+const hull = geohashesToConvexHull(['gcpvj', 'gcpvm', 'gcpvn'])
+// [[lon, lat], [lon, lat], ...] — convex hull vertices
+```
+
+### deduplicateGeohashes(hashes)
+
+Remove redundant ancestors from a multi-precision geohash set.
+
+```typescript
+deduplicateGeohashes(hashes: string[]): string[]
+
+deduplicateGeohashes(['gcp', 'gcpvj', 'gcpvm', 'u10'])  // ['gcp', 'u10']
+```
+
+### pointInPolygon(point, polygon)
+
+Ray-casting point-in-polygon test.
+
+```typescript
+pointInPolygon(point: [number, number], polygon: [number, number][]): boolean
+
+pointInPolygon([5, 5], [[0, 0], [10, 0], [10, 10], [0, 10]])  // true
+```
+
+### boundsOverlapsPolygon(bounds, polygon)
+
+Check if a geohash cell's bounds overlap a polygon.
+
+```typescript
+boundsOverlapsPolygon(bounds: GeohashBounds, polygon: [number, number][]): boolean
+```
+
+### boundsFullyInsidePolygon(bounds, polygon)
+
+Check if a geohash cell is fully inside a polygon.
+
+```typescript
+boundsFullyInsidePolygon(bounds: GeohashBounds, polygon: [number, number][]): boolean
+```
+
+---
+
+## geohash-kit/nostr
+
+### createGTagLadder(geohash, minPrecision?)
+
+Generate multi-precision g-tag ladder for Nostr event publishing.
+
+```typescript
+createGTagLadder(geohash: string, minPrecision?: number): string[][]
+
+createGTagLadder('gcpvj')
+// [['g','g'], ['g','gc'], ['g','gcp'], ['g','gcpv'], ['g','gcpvj']]
+
+createGTagLadder('gcpvj', 3)
+// [['g','gcp'], ['g','gcpv'], ['g','gcpvj']]
+```
+
+### createGTagFilter(lat, lon, radiusMetres)
+
+Generate a #g filter for Nostr REQ from coordinates and radius.
+Encodes location, selects precision from radius, expands to neighbours.
+
+```typescript
+createGTagFilter(lat: number, lon: number, radiusMetres: number): { '#g': string[] }
+
+createGTagFilter(51.5074, -0.1278, 5000)
+// { '#g': ['gcpvj', 'gcpvm', 'gcpvn', ...] }
+```
+
+### createGTagFilterFromGeohashes(hashes)
+
+Generate a #g filter from an existing geohash set.
+
+```typescript
+createGTagFilterFromGeohashes(hashes: string[]): { '#g': string[] }
+
+createGTagFilterFromGeohashes(['gcpvj', 'gcpvm'])
+// { '#g': ['gcpvj', 'gcpvm'] }
+```
+
+### expandRings(hash, rings?)
+
+Expand geohash into concentric rings of neighbours.
+
+```typescript
+expandRings(hash: string, rings?: number): string[][]
+
+expandRings('gcpvj', 1)
+// [['gcpvj'], ['neighbour1', 'neighbour2', ..., 'neighbour8']]
+
+expandRings('gcpvj', 2)
+// [['gcpvj'], [8 ring-1 cells], [16 ring-2 cells]]
+```
+
+### nearbyFilter(lat, lon, options?)
+
+Convenience: encode + expand rings + flatten to filter.
+
+```typescript
+nearbyFilter(
+  lat: number,
+  lon: number,
+  options?: { precision?: number; rings?: number }
+): { '#g': string[] }
+
+nearbyFilter(51.5074, -0.1278)                        // precision 5, 1 ring
+nearbyFilter(51.5074, -0.1278, { precision: 3 })      // precision 3, 1 ring
+nearbyFilter(51.5074, -0.1278, { rings: 2 })           // precision 5, 2 rings
+```
+
+### parseGTags(tags)
+
+Extract and parse g tags from a Nostr event's tag array.
+
+```typescript
+parseGTags(tags: string[][]): Array<{ geohash: string; precision: number }>
+
+parseGTags([['g', 'gcpvj'], ['p', 'abc'], ['g', 'gcp']])
+// [{ geohash: 'gcpvj', precision: 5 }, { geohash: 'gcp', precision: 3 }]
+```
+
+### bestGeohash(tags)
+
+Return the highest-precision g tag from an event's tag array.
+
+```typescript
+bestGeohash(tags: string[][]): string | undefined
+
+bestGeohash([['g', 'g'], ['g', 'gc'], ['g', 'gcpvj']])  // 'gcpvj'
+bestGeohash([['p', 'abc']])                               // undefined
+```
+
+---
+
+## Nostr Usage Patterns
+
+### Publishing an event with location
+
+```typescript
+import { encode, createGTagLadder } from 'geohash-kit'
+
+const geohash = encode(51.5074, -0.1278, 6)  // 'gcpvjb'
+const tags = createGTagLadder(geohash)
+// Add tags to your Nostr event:
+// [['g','g'], ['g','gc'], ['g','gcp'], ['g','gcpv'], ['g','gcpvj'], ['g','gcpvjb']]
+```
+
+### Subscribing to nearby events
+
+```typescript
+import { createGTagFilter } from 'geohash-kit'
+
+const filter = createGTagFilter(51.5074, -0.1278, 5000)
+// Use in Nostr REQ: ['REQ', subId, { kinds: [1], ...filter }]
+```
+
+### Round-trip: publish → subscribe → match
+
+```typescript
+import { encode, createGTagLadder, createGTagFilter } from 'geohash-kit'
+
+// Publisher
+const hash = encode(51.5074, -0.1278, 6)
+const eventTags = createGTagLadder(hash)
+
+// Subscriber (nearby location)
+const filter = createGTagFilter(51.5080, -0.1270, 2000)
+
+// Match: at least one event tag value appears in the filter
+const tagValues = eventTags.map(t => t[1])
+const filterSet = new Set(filter['#g'])
+const matches = tagValues.some(v => filterSet.has(v))  // true
+```
