@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   encode, decode, bounds, children, contains, matchesAny,
   neighbour, neighbours,
+  distance, distanceFromCoords, radiusToPrecision, precisionToRadius,
   type GeohashBounds,
 } from './core.js'
 
@@ -217,6 +218,94 @@ describe('neighbours', () => {
     const n = neighbours('gcpvj')
     for (const v of Object.values(n)) {
       expect(v.length).toBe(5)
+    }
+  })
+})
+
+describe('distanceFromCoords', () => {
+  it('returns 0 for same point', () => {
+    expect(distanceFromCoords(51.5074, -0.1278, 51.5074, -0.1278)).toBe(0)
+  })
+
+  it('calculates London to Paris (~340km)', () => {
+    const d = distanceFromCoords(51.5074, -0.1278, 48.8566, 2.3522)
+    expect(d).toBeGreaterThan(330_000)
+    expect(d).toBeLessThan(350_000)
+  })
+
+  it('calculates equator distance (1 degree ~111km)', () => {
+    const d = distanceFromCoords(0, 0, 0, 1)
+    expect(d).toBeGreaterThan(110_000)
+    expect(d).toBeLessThan(112_000)
+  })
+})
+
+describe('distance', () => {
+  it('returns distance between two geohash cell centres', () => {
+    const d = distance('gcpvj', 'u09tu') // London to Paris
+    expect(d).toBeGreaterThan(300_000)
+    expect(d).toBeLessThan(400_000)
+  })
+
+  it('returns 0 for same geohash', () => {
+    expect(distance('gcpvj', 'gcpvj')).toBe(0)
+  })
+
+  it('returns small distance for adjacent cells', () => {
+    const n = neighbour('gcpvj', 'n')
+    const d = distance('gcpvj', n)
+    // Adjacent precision-5 cells should be within ~5km
+    expect(d).toBeLessThan(10_000)
+    expect(d).toBeGreaterThan(0)
+  })
+})
+
+describe('radiusToPrecision', () => {
+  it('returns 1 for very large radius (>2500km)', () => {
+    expect(radiusToPrecision(5_000_000)).toBe(1)
+  })
+
+  it('returns 5 for ~2.5km radius', () => {
+    expect(radiusToPrecision(2_500)).toBe(5)
+  })
+
+  it('returns 7 for ~80m radius', () => {
+    expect(radiusToPrecision(80)).toBe(7)
+  })
+
+  it('returns 9 for very small radius (<3m)', () => {
+    expect(radiusToPrecision(2)).toBe(9)
+  })
+
+  it('monotonically increases with decreasing radius', () => {
+    const radii = [5_000_000, 500_000, 50_000, 5_000, 500, 50, 5]
+    const precisions = radii.map(radiusToPrecision)
+    for (let i = 1; i < precisions.length; i++) {
+      expect(precisions[i]).toBeGreaterThanOrEqual(precisions[i - 1])
+    }
+  })
+})
+
+describe('precisionToRadius', () => {
+  it('returns large radius for precision 1', () => {
+    expect(precisionToRadius(1)).toBeGreaterThan(2_000_000)
+  })
+
+  it('returns ~2.4km for precision 5', () => {
+    const r = precisionToRadius(5)
+    expect(r).toBeGreaterThan(2_000)
+    expect(r).toBeLessThan(3_000)
+  })
+
+  it('returns small radius for precision 9', () => {
+    expect(precisionToRadius(9)).toBeLessThan(5)
+  })
+
+  it('is approximate inverse of radiusToPrecision', () => {
+    for (let p = 1; p <= 9; p++) {
+      const radius = precisionToRadius(p)
+      const recovered = radiusToPrecision(radius)
+      expect(recovered).toBe(p)
     }
   })
 })

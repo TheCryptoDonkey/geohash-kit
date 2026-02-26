@@ -137,3 +137,55 @@ export function neighbours(hash: string): Record<Direction, string> {
     nw: neighbour(hash, 'nw'),
   }
 }
+
+// --- Distance ---
+
+const EARTH_RADIUS_M = 6_371_000 // Earth mean radius in metres
+
+/** Haversine distance in metres between two coordinate pairs. */
+export function distanceFromCoords(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/** Haversine distance in metres between centres of two geohash cells. */
+export function distance(hashA: string, hashB: string): number {
+  const a = decode(hashA)
+  const b = decode(hashB)
+  return distanceFromCoords(a.lat, a.lon, b.lat, b.lon)
+}
+
+// --- Precision ↔ Radius ---
+
+// Approximate cell half-diagonal in metres at each precision level (equator).
+const PRECISION_RADIUS_M: number[] = [
+  /* 0 (unused) */ 0,
+  /* 1 */ 2_500_000,
+  /* 2 */ 630_000,
+  /* 3 */ 78_000,
+  /* 4 */ 20_000,
+  /* 5 */ 2_400,
+  /* 6 */ 610,
+  /* 7 */ 76,
+  /* 8 */ 19,
+  /* 9 */ 2.4,
+]
+
+/** Optimal geohash precision for a given search radius in metres. */
+export function radiusToPrecision(metres: number): number {
+  for (let p = 1; p <= 9; p++) {
+    if (PRECISION_RADIUS_M[p] <= metres) return p
+  }
+  return 9
+}
+
+/** Approximate cell radius in metres for a given precision level. */
+export function precisionToRadius(precision: number): number {
+  const p = Math.max(1, Math.min(9, Math.round(precision)))
+  return PRECISION_RADIUS_M[p]
+}
