@@ -3,7 +3,7 @@
 **The modern TypeScript geohash toolkit — encode, decode, cover polygons, and discover location-based Nostr events.**
 
 [![npm](https://img.shields.io/npm/v/geohash-kit)](https://www.npmjs.com/package/geohash-kit)
-[![licence](https://img.shields.io/npm/l/geohash-kit)](./LICENCE)
+[![licence](https://img.shields.io/npm/l/geohash-kit)](./LICENSE)
 ![zero deps](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-native-blue)
 
@@ -247,4 +247,4 @@ See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-
 
 ## Licence
 
-[MIT](./LICENCE)
+[MIT](./LICENSE)
