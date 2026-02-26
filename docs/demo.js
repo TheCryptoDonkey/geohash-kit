@@ -1,9 +1,9 @@
-// --- CDN import of geohash-kit ---
+// --- Local import of geohash-kit ---
 import {
   encode, decode, bounds, neighbours,
   polygonToGeohashes, geohashesToGeoJSON,
   createGTagLadder, createGTagFilter, expandRings,
-} from 'https://esm.sh/geohash-kit'
+} from './lib/index.js'
 
 // --- Map setup ---
 const map = L.map('map').setView([51.5074, -0.1278], 12)
