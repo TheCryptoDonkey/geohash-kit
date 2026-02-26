@@ -229,12 +229,16 @@ describe('greedy multi-precision coverage', () => {
       [1.0, 52.5],
       [-2.0, 52.5],
     ]
-    const result = polygonToGeohashes(large, { mergeThreshold: 0 })
+    // With high maxCells to avoid auto-stepping, threshold 0 should produce
+    // coarse interior cells (only fully-inside cells, as coarse as they fit).
+    const result = polygonToGeohashes(large, { mergeThreshold: 0, maxPrecision: 7, maxCells: 50000 })
     const minPrecision = Math.min(...result.map((h) => h.length))
-    expect(minPrecision).toBeLessThanOrEqual(2)
+    // For a 3° × 2° polygon, the coarsest fully-inside cells are p3
+    // (p1/p2 cells are too large to fit entirely inside)
+    expect(minPrecision).toBeLessThan(7)
   })
 
-  it('at threshold 1 edge cells reach maxPrecision but interior cells are coarse', () => {
+  it('at threshold 1 all cells are uniform at maxPrecision', () => {
     const poly: [number, number][] = [
       [-0.20, 51.45],
       [-0.05, 51.45],
@@ -242,6 +246,21 @@ describe('greedy multi-precision coverage', () => {
       [-0.20, 51.55],
     ]
     const result = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 1.0, maxCells: 50000 })
+    const precisions = new Set(result.map((h) => h.length))
+    // At threshold 1.0, interiorMinPrecision = maxPrecision, so all cells are uniform
+    expect(precisions.size).toBe(1)
+    expect(Math.max(...result.map((h) => h.length))).toBe(7)
+  })
+
+  it('at threshold < 1 interior cells are coarser than edge cells', () => {
+    // Use a larger polygon to ensure some cells fit fully inside at coarse precision
+    const poly: [number, number][] = [
+      [-1.0, 51.0],
+      [0.5, 51.0],
+      [0.5, 52.0],
+      [-1.0, 52.0],
+    ]
+    const result = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 0.5, maxCells: 50000 })
     const precisions = new Set(result.map((h) => h.length))
     // Multi-precision: coarse interior + fine edges
     expect(precisions.size).toBeGreaterThanOrEqual(2)
