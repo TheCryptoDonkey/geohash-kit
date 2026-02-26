@@ -1,0 +1,94 @@
+// geohash-kit/core — encode, decode, bounds, children, contains, matchesAny
+
+const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+const BASE32_DECODE: Record<string, number> = {}
+for (let i = 0; i < BASE32.length; i++) BASE32_DECODE[BASE32[i]] = i
+
+// --- Types ---
+
+export interface GeohashBounds {
+  minLat: number
+  maxLat: number
+  minLon: number
+  maxLon: number
+}
+
+export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+
+// --- Encoding ---
+
+/** Encode latitude/longitude to a geohash string. Default precision 5 (~4.9km). */
+export function encode(lat: number, lon: number, precision = 5): string {
+  let latMin = -90, latMax = 90
+  let lonMin = -180, lonMax = 180
+  let hash = ''
+  let bit = 0
+  let ch = 0
+  let isLon = true
+
+  while (hash.length < precision) {
+    if (isLon) {
+      const mid = (lonMin + lonMax) / 2
+      if (lon >= mid) { ch |= 1 << (4 - bit); lonMin = mid } else { lonMax = mid }
+    } else {
+      const mid = (latMin + latMax) / 2
+      if (lat >= mid) { ch |= 1 << (4 - bit); latMin = mid } else { latMax = mid }
+    }
+    isLon = !isLon
+    bit++
+    if (bit === 5) { hash += BASE32[ch]; bit = 0; ch = 0 }
+  }
+  return hash
+}
+
+/** Decode a geohash to its centre point with error margins. */
+export function decode(hash: string): { lat: number; lon: number; error: { lat: number; lon: number } } {
+  const b = bounds(hash)
+  return {
+    lat: (b.minLat + b.maxLat) / 2,
+    lon: (b.minLon + b.maxLon) / 2,
+    error: {
+      lat: (b.maxLat - b.minLat) / 2,
+      lon: (b.maxLon - b.minLon) / 2,
+    },
+  }
+}
+
+/** Get the bounding rectangle of a geohash cell. */
+export function bounds(hash: string): GeohashBounds {
+  let minLat = -90, maxLat = 90
+  let minLon = -180, maxLon = 180
+  let isLon = true
+
+  for (const ch of hash) {
+    const bits = BASE32_DECODE[ch]
+    for (let bit = 4; bit >= 0; bit--) {
+      if (isLon) {
+        const mid = (minLon + maxLon) / 2
+        if ((bits >> bit) & 1) minLon = mid; else maxLon = mid
+      } else {
+        const mid = (minLat + maxLat) / 2
+        if ((bits >> bit) & 1) minLat = mid; else maxLat = mid
+      }
+      isLon = !isLon
+    }
+  }
+  return { minLat, maxLat, minLon, maxLon }
+}
+
+/** Get the 32 children of a geohash at the next precision level. */
+export function children(hash: string): string[] {
+  return Array.from(BASE32, (ch) => hash + ch)
+}
+
+// --- Matching ---
+
+/** Check if two geohashes overlap (bidirectional prefix containment). */
+export function contains(a: string, b: string): boolean {
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+/** Check if a geohash matches any candidate in a multi-precision set. */
+export function matchesAny(hash: string, candidates: string[]): boolean {
+  return candidates.some(c => contains(hash, c))
+}
