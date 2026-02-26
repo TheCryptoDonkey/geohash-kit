@@ -175,6 +175,39 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 | Last published | 2026 | 2022 | 2024 | 2022 | 2022 | 2022 | 2025 |
 | Weekly downloads | — | ~171k | ~2k | ~19k | ~1k | ~1k | <100 |
 
+## Migrating from ngeohash
+
+geohash-kit is a modern TypeScript replacement for [ngeohash](https://github.com/sunng87/node-geohash).
+
+**Import change:**
+
+```typescript
+// Before
+const ngeohash = require('ngeohash')
+
+// After (ESM)
+import { encode, decode, bounds, neighbours } from 'geohash-kit'
+```
+
+**Function mapping:**
+
+| ngeohash | geohash-kit | Notes |
+|----------|-------------|-------|
+| `encode(lat, lon, precision?)` | `encode(lat, lon, precision?)` | Same signature |
+| `decode(hash)` | `decode(hash)` | Returns `{ lat, lon, error }` instead of `{ latitude, longitude, error }` |
+| `decode_bbox(hash)` | `bounds(hash)` | Returns `{ minLat, maxLat, minLon, maxLon }` object instead of `[minlat, minlon, maxlat, maxlon]` array |
+| `neighbors(hash)` | `neighbours(hash)` | British spelling; returns `{ n, ne, e, ... }` object instead of array |
+| `neighbor(hash, [latDir, lonDir])` | `neighbour(hash, direction)` | Direction is a string (`'n'`, `'sw'`, etc.) instead of `[1, 0]` array |
+| `bboxes(minLat, minLon, maxLat, maxLon, precision)` | `polygonToGeohashes(polygon)` | More powerful: accepts polygons (not just rectangles), multi-precision output, maxCells budget |
+| `encode_int` / `decode_int` / `*_int` | — | Integer geohash encoding not supported |
+
+**Key differences:**
+
+- **ESM-only** — no `require()`, use `import` syntax
+- **Input validation** — throws `RangeError` on invalid coordinates, NaN, or Infinity (ngeohash returns garbage)
+- **British English** — `neighbours` not `neighbors`, `neighbour` not `neighbor`
+- **Structured returns** — named object properties instead of positional arrays
+
 ## For AI Assistants
 
 See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-full.txt) for the complete reference with examples.
