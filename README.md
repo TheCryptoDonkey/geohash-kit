@@ -154,6 +154,8 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 5. Post-processing merges sibling sets based on `mergeThreshold` — at threshold 1.0 only complete sets (32/32), at 0.0 as few as 24/32. Result is sorted and deduplicated
 6. If no precision level fits within `maxCells`, a `RangeError` is thrown — increase `maxCells` or reduce the polygon area
 
+**Memory:** `polygonToGeohashes` builds the full result array in memory. At `maxCells: 100,000` with average hash length 6, this is roughly 1–2 MB — well within typical Node.js/browser limits. For extremely large polygons (millions of cells), consider splitting the polygon into smaller regions and processing each independently.
+
 ## Comparison
 
 | Feature | geohash-kit | ngeohash | geohashing | latlon-geohash | geohash-poly | shape2geohash | nostr-geotags |
