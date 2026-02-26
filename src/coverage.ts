@@ -152,29 +152,47 @@ export interface CoverageOptions {
   mergeThreshold?: number
 }
 
+/** Internal representation of a polygon with optional holes. */
+interface NormalisedPolygon {
+  outer: [number, number][]
+  holes: [number, number][][]
+}
+
+/** Strip closing vertex from a ring if it duplicates the first vertex. */
+function stripClosingVertex(ring: [number, number][]): [number, number][] {
+  if (ring.length > 1 &&
+      ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]) {
+    return ring.slice(0, -1)
+  }
+  return ring
+}
+
 /**
- * Normalise a PolygonInput to a [lon, lat][] coordinate array.
- * - `[number, number][]` → returned as-is
- * - GeoJSON Polygon → outer ring extracted (closing vertex stripped if present)
+ * Normalise a PolygonInput to a NormalisedPolygon with outer ring and holes.
+ * - `[number, number][]` → outer ring only, no holes
+ * - GeoJSON Polygon → outer ring + inner rings (holes) extracted
  * - GeoJSON MultiPolygon → not handled here (caller processes each polygon separately)
  */
-function normalisePolygonInput(input: PolygonInput): [number, number][] {
+function normalisePolygonInput(input: PolygonInput): NormalisedPolygon {
   if (Array.isArray(input)) {
-    return input
+    return { outer: input, holes: [] }
   }
   if (input.type === 'Polygon') {
     const ring = input.coordinates[0]
     if (!ring || ring.length === 0) {
       throw new Error('GeoJSON Polygon has no outer ring')
     }
-    // Strip closing vertex if it duplicates the first
-    const coords = ring as [number, number][]
-    if (coords.length > 1 &&
-        coords[0][0] === coords[coords.length - 1][0] &&
-        coords[0][1] === coords[coords.length - 1][1]) {
-      return coords.slice(0, -1)
+    const outer = stripClosingVertex(ring as [number, number][])
+    // Extract inner rings (holes), stripping closing vertices and ignoring degenerate rings
+    const holes: [number, number][][] = []
+    for (let i = 1; i < input.coordinates.length; i++) {
+      const holeRing = stripClosingVertex(input.coordinates[i] as [number, number][])
+      if (holeRing.length >= 3) {
+        holes.push(holeRing)
+      }
     }
-    return coords
+    return { outer, holes }
   }
   throw new Error(`Unsupported input type: ${(input as { type: string }).type}`)
 }
@@ -197,17 +215,58 @@ export function polygonToGeohashes(
   input: PolygonInput,
   options: CoverageOptions = {},
 ): string[] {
-  // Handle MultiPolygon: process each polygon, merge and deduplicate
+  // Parse and validate options upfront (shared by single and multi paths)
+  const { minPrecision: rawMin = 1, maxPrecision: rawMax = 9, maxCells = 500, mergeThreshold: rawThreshold = 1.0 } = options
+  if (!Number.isFinite(rawMin)) throw new RangeError(`Invalid minPrecision: ${rawMin}`)
+  if (!Number.isFinite(rawMax)) throw new RangeError(`Invalid maxPrecision: ${rawMax}`)
+  if (!Number.isFinite(maxCells) || maxCells < 1) throw new RangeError(`Invalid maxCells: ${maxCells}`)
+  if (!Number.isFinite(rawThreshold)) throw new RangeError(`Invalid mergeThreshold: ${rawThreshold}`)
+  const minPrecision = Math.max(1, Math.min(9, Math.round(rawMin)))
+  const maxPrecision = Math.max(minPrecision, Math.min(9, Math.round(rawMax)))
+  const threshold = Math.max(0, Math.min(1, rawThreshold))
+
+  // Handle MultiPolygon: global maxCells cap across all child polygons
   if (!Array.isArray(input) && input.type === 'MultiPolygon') {
-    const allHashes: string[] = []
-    for (const polyCoords of input.coordinates) {
-      const singlePolygon: GeoJSONPolygon = { type: 'Polygon', coordinates: polyCoords }
-      allHashes.push(...polygonToGeohashes(singlePolygon, options))
+    if (input.coordinates.length === 0) return []
+
+    // Normalise all children upfront
+    const children = input.coordinates.map((polyCoords) =>
+      normalisePolygonInput({ type: 'Polygon', coordinates: polyCoords }),
+    )
+
+    // Retry loop from maxPrecision down to minPrecision
+    const bailout = maxCells * 4
+    for (let mp = maxPrecision; mp >= minPrecision; mp--) {
+      const allHashes: string[] = []
+      let bailed = false
+      for (const { outer, holes } of children) {
+        if (outer.length < 3) continue
+        const result = computeGeohashes(outer, holes, minPrecision, mp, threshold, bailout)
+        if (result === null) { bailed = true; break }
+        allHashes.push(...result)
+      }
+      if (bailed) continue
+      const merged = deduplicateGeohashes(allHashes)
+      if (merged.length <= maxCells) return merged
     }
-    return deduplicateGeohashes(allHashes)
+
+    // Fallback: minPrecision with threshold=0
+    const fallbackAll: string[] = []
+    for (const { outer, holes } of children) {
+      if (outer.length < 3) continue
+      const result = computeGeohashes(outer, holes, minPrecision, minPrecision, 0) ?? []
+      fallbackAll.push(...result)
+    }
+    const fallback = deduplicateGeohashes(fallbackAll)
+    if (fallback.length <= maxCells) return fallback
+
+    throw new RangeError(
+      `MultiPolygon requires at least ${fallback.length} cells at precision ${minPrecision}, but maxCells is ${maxCells}. ` +
+      'Increase maxCells or reduce the polygon area.',
+    )
   }
 
-  const polygon = normalisePolygonInput(input)
+  const { outer: polygon, holes } = normalisePolygonInput(input)
 
   // Guard: degenerate polygons
   if (polygon.length < 3) {
@@ -222,26 +281,17 @@ export function polygonToGeohashes(
     }
   }
 
-  const { minPrecision: rawMin = 1, maxPrecision: rawMax = 9, maxCells = 500, mergeThreshold: rawThreshold = 1.0 } = options
-  if (!Number.isFinite(rawMin)) throw new RangeError(`Invalid minPrecision: ${rawMin}`)
-  if (!Number.isFinite(rawMax)) throw new RangeError(`Invalid maxPrecision: ${rawMax}`)
-  if (!Number.isFinite(maxCells) || maxCells < 1) throw new RangeError(`Invalid maxCells: ${maxCells}`)
-  if (!Number.isFinite(rawThreshold)) throw new RangeError(`Invalid mergeThreshold: ${rawThreshold}`)
-  const minPrecision = Math.max(1, Math.min(9, Math.round(rawMin)))
-  const maxPrecision = Math.max(minPrecision, Math.min(9, Math.round(rawMax)))
-  const threshold = Math.max(0, Math.min(1, rawThreshold))
-
   // Early bailout limit
   const bailout = maxCells * 4
 
   // Try at requested maxPrecision, stepping down if too many cells
   for (let mp = maxPrecision; mp >= minPrecision; mp--) {
-    const result = computeGeohashes(polygon, minPrecision, mp, threshold, bailout)
+    const result = computeGeohashes(polygon, holes, minPrecision, mp, threshold, bailout)
     if (result !== null && result.length <= maxCells) return result
   }
 
   // Fallback: minPrecision with threshold=0
-  const fallback = computeGeohashes(polygon, minPrecision, minPrecision, 0) ?? []
+  const fallback = computeGeohashes(polygon, holes, minPrecision, minPrecision, 0) ?? []
   if (fallback.length <= maxCells) return fallback
 
   throw new RangeError(
@@ -262,6 +312,7 @@ export function polygonToGeohashes(
  */
 function computeGeohashes(
   polygon: [number, number][],
+  holes: [number, number][][],
   minPrecision: number,
   maxPrecision: number,
   coverageThreshold: number,
@@ -269,6 +320,7 @@ function computeGeohashes(
 ): string[] | null {
   const result: string[] = []
   const limit = bailout ?? Infinity
+  const hasHoles = holes.length > 0
 
   // Pre-compute polygon AABB for fast rejection.
   let polyMinLon = Infinity, polyMaxLon = -Infinity
@@ -278,6 +330,36 @@ function computeGeohashes(
     if (lon > polyMaxLon) polyMaxLon = lon
     if (lat < polyMinLat) polyMinLat = lat
     if (lat > polyMaxLat) polyMaxLat = lat
+  }
+
+  /**
+   * Check if bounds are fully inside the outer polygon and not fully inside any hole.
+   * A cell is "fully inside" the effective polygon when:
+   * - all corners are inside the outer ring, AND
+   * - the cell does not overlap any hole
+   */
+  const isFullyInside = (b: GeohashBounds): boolean => {
+    if (!boundsFullyInsidePolygon(b, polygon)) return false
+    if (hasHoles) {
+      for (const hole of holes) {
+        if (boundsOverlapsPolygon(b, hole)) return false
+      }
+    }
+    return true
+  }
+
+  /**
+   * Check if bounds overlap the effective polygon (outer minus holes).
+   * A cell overlaps when it overlaps the outer ring AND is not fully inside any hole.
+   */
+  const doesOverlap = (b: GeohashBounds): boolean => {
+    if (!boundsOverlapsPolygon(b, polygon)) return false
+    if (hasHoles) {
+      for (const hole of holes) {
+        if (boundsFullyInsidePolygon(b, hole)) return false
+      }
+    }
+    return true
   }
 
   // Interior cells must reach at least this precision before being emitted.
@@ -292,14 +374,14 @@ function computeGeohashes(
     const b = geohashBounds(hash)
     if (b.maxLon < polyMinLon || b.minLon > polyMaxLon ||
         b.maxLat < polyMinLat || b.minLat > polyMaxLat) return false
-    return boundsOverlapsPolygon(b, polygon)
+    return doesOverlap(b)
   })
 
   while (queue.length > 0) {
     const hash = queue.pop()!
     const b = geohashBounds(hash)
 
-    if (boundsFullyInsidePolygon(b, polygon)) {
+    if (isFullyInside(b)) {
       if (hash.length >= interiorMinPrecision) {
         result.push(hash)
       } else {
@@ -308,20 +390,23 @@ function computeGeohashes(
         }
       }
     } else if (hash.length >= maxPrecision) {
-      result.push(hash)
+      // At max precision: only emit if it overlaps the effective polygon
+      if (doesOverlap(b)) {
+        result.push(hash)
+      }
     } else {
       for (const child of geohashChildren(hash)) {
         const cb = geohashBounds(child)
         // Fast AABB rejection before expensive polygon checks
         if (cb.maxLon < polyMinLon || cb.minLon > polyMaxLon ||
             cb.maxLat < polyMinLat || cb.minLat > polyMaxLat) continue
-        if (boundsFullyInsidePolygon(cb, polygon)) {
+        if (isFullyInside(cb)) {
           if (child.length >= interiorMinPrecision) {
             result.push(child)
           } else {
             queue.push(child)
           }
-        } else if (boundsOverlapsPolygon(cb, polygon)) {
+        } else if (doesOverlap(cb)) {
           queue.push(child)
         }
       }
@@ -420,9 +505,8 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
   if (points.length < 3) return points
 
   // Guard: antimeridian-straddling hashes produce hulls that break planar geometry
-  const hasEast = points.some(p => p[0] > 90)
-  const hasWest = points.some(p => p[0] < -90)
-  if (hasEast && hasWest) {
+  const lons = points.map(p => p[0])
+  if (Math.max(...lons) - Math.min(...lons) > 180) {
     throw new Error(
       'Geohashes straddle the antimeridian (±180° longitude). ' +
       'Split into separate sets and compute hulls independently.',

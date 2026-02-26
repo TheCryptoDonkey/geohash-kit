@@ -424,6 +424,13 @@ describe('geohashesToConvexHull — antimeridian', () => {
     const h2 = encode(0, 175, 3)
     expect(() => geohashesToConvexHull([h1, h2])).not.toThrow()
   })
+
+  it('throws for wide-span hashes where old ±90 heuristic has false negative', () => {
+    // Hash 't' has bounds [45,90] — maxLon is exactly 90, not >90 (strict)
+    // Hash '9' has bounds [-135,-90] — minLon is -135, which is <-90
+    // Span is 225° (>180) but old heuristic misses it because 90 > 90 is false
+    expect(() => geohashesToConvexHull(['t', '9'])).toThrow(/antimeridian/)
+  })
 })
 
 describe('polygonToGeohashes — degenerate polygon guard', () => {
@@ -600,6 +607,143 @@ describe('polygonToGeohashes — GeoJSON input', () => {
     const empty = { type: 'MultiPolygon' as const, coordinates: [] as number[][][][] }
     const result = polygonToGeohashes(empty)
     expect(result).toEqual([])
+  })
+})
+
+describe('polygonToGeohashes — GeoJSON holes', () => {
+  // Outer ring: ~0.1° square around central London
+  const outer: [number, number][] = [
+    [-0.15, 51.49], [-0.05, 51.49], [-0.05, 51.54], [-0.15, 51.54],
+  ]
+  // Hole: small square in the centre of the outer ring
+  const hole: [number, number][] = [
+    [-0.12, 51.51], [-0.08, 51.51], [-0.08, 51.53], [-0.12, 51.53],
+  ]
+
+  const donutPolygon = {
+    type: 'Polygon' as const,
+    coordinates: [
+      [...outer, outer[0]], // outer ring (closed)
+      [...hole, hole[0]],   // hole (closed)
+    ],
+  }
+
+  it('polygon with hole produces fewer cells than without hole', () => {
+    const solidPolygon = {
+      type: 'Polygon' as const,
+      coordinates: [[...outer, outer[0]]],
+    }
+    const opts = { maxPrecision: 6, maxCells: 10000 }
+    const solidResult = polygonToGeohashes(solidPolygon, opts)
+    const donutResult = polygonToGeohashes(donutPolygon, opts)
+    expect(donutResult.length).toBeLessThan(solidResult.length)
+  })
+
+  it('no result geohash is fully inside the hole', () => {
+    const opts = { maxPrecision: 6, maxCells: 10000 }
+    const result = polygonToGeohashes(donutPolygon, opts)
+    for (const hash of result) {
+      const b = bounds(hash)
+      expect(boundsFullyInsidePolygon(b, hole)).toBe(false)
+    }
+  })
+
+  it('multiple holes all respected', () => {
+    // Second hole in another part of the polygon
+    const hole2: [number, number][] = [
+      [-0.14, 51.49], [-0.13, 51.49], [-0.13, 51.50], [-0.14, 51.50],
+    ]
+    const multiHole = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [...outer, outer[0]],
+        [...hole, hole[0]],
+        [...hole2, hole2[0]],
+      ],
+    }
+    const singleHole = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [...outer, outer[0]],
+        [...hole, hole[0]],
+      ],
+    }
+    const opts = { maxPrecision: 6, maxCells: 10000 }
+    const multiResult = polygonToGeohashes(multiHole, opts)
+    const singleResult = polygonToGeohashes(singleHole, opts)
+    expect(multiResult.length).toBeLessThanOrEqual(singleResult.length)
+  })
+
+  it('degenerate hole (< 3 vertices) is silently ignored', () => {
+    const degenerateHole = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [...outer, outer[0]],
+        [[-0.12, 51.51], [-0.08, 51.51]], // only 2 vertices
+      ],
+    }
+    const solidPolygon = {
+      type: 'Polygon' as const,
+      coordinates: [[...outer, outer[0]]],
+    }
+    const opts = { maxPrecision: 6, maxCells: 10000 }
+    // Should produce same result as polygon without hole
+    const degResult = polygonToGeohashes(degenerateHole, opts)
+    const solidResult = polygonToGeohashes(solidPolygon, opts)
+    expect(degResult).toEqual(solidResult)
+  })
+
+  it('coordinate array input still works (backward compatible)', () => {
+    const result = polygonToGeohashes(outer)
+    expect(result.length).toBeGreaterThan(0)
+  })
+})
+
+describe('polygonToGeohashes — MultiPolygon global maxCells', () => {
+  // Two disjoint polygons: London and Paris areas
+  const multi = {
+    type: 'MultiPolygon' as const,
+    coordinates: [
+      // London
+      [[[-0.15, 51.49], [-0.05, 51.49], [-0.05, 51.54], [-0.15, 51.54], [-0.15, 51.49]]],
+      // Paris
+      [[[2.30, 48.83], [2.40, 48.83], [2.40, 48.88], [2.30, 48.88], [2.30, 48.83]]],
+    ],
+  }
+
+  it('two disjoint polygons with maxCells: 50 → result ≤ 50', () => {
+    const result = polygonToGeohashes(multi, { maxCells: 50 })
+    expect(result.length).toBeLessThanOrEqual(50)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('infeasible budget → RangeError', () => {
+    expect(() => polygonToGeohashes(multi, { maxCells: 1 })).toThrow(RangeError)
+  })
+
+  it('precision step-down works for MultiPolygon', () => {
+    // With a tight budget, the algorithm should step down precision
+    const result = polygonToGeohashes(multi, { maxCells: 30 })
+    expect(result.length).toBeLessThanOrEqual(30)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('MultiPolygon with holes in child polygons', () => {
+    const multiWithHoles = {
+      type: 'MultiPolygon' as const,
+      coordinates: [
+        // London with a hole
+        [
+          [[-0.15, 51.49], [-0.05, 51.49], [-0.05, 51.54], [-0.15, 51.54], [-0.15, 51.49]],
+          [[-0.12, 51.51], [-0.08, 51.51], [-0.08, 51.53], [-0.12, 51.53], [-0.12, 51.51]],
+        ],
+        // Paris (no hole)
+        [[[2.30, 48.83], [2.40, 48.83], [2.40, 48.88], [2.30, 48.88], [2.30, 48.83]]],
+      ],
+    }
+    const result = polygonToGeohashes(multiWithHoles, { maxCells: 500 })
+    expect(result.length).toBeGreaterThan(0)
+    expect(result.length).toBeLessThanOrEqual(500)
   })
 })
 

@@ -50,6 +50,15 @@ const coverage = polygonToGeohashes([
 // Render coverage on a map
 const geojson = geohashesToGeoJSON(coverage)
 
+// Cover a donut polygon (outer ring with a hole)
+const donut = polygonToGeohashes({
+  type: 'Polygon',
+  coordinates: [
+    [[-0.15, 51.49], [-0.05, 51.49], [-0.05, 51.54], [-0.15, 51.54], [-0.15, 51.49]],
+    [[-0.12, 51.51], [-0.08, 51.51], [-0.08, 51.53], [-0.12, 51.53], [-0.12, 51.51]],
+  ],
+})
+
 // Generate Nostr event tags
 const tags = createGTagLadder(hash)
 // [['g','g'], ['g','gc'], ['g','gcp'], ['g','gcpv'], ['g','gcpvj']]
@@ -119,7 +128,7 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 
 | Function | Description |
 |----------|-------------|
-| `polygonToGeohashes(polygon, options?)` | Adaptive threshold polygon coverage; accepts `[lon, lat][]`, GeoJSON `Polygon`, or `MultiPolygon` |
+| `polygonToGeohashes(polygon, options?)` | Adaptive threshold polygon coverage; accepts `[lon, lat][]`, GeoJSON `Polygon` (with holes), or `MultiPolygon` |
 | `geohashesToGeoJSON(hashes)` | GeoJSON FeatureCollection for map rendering |
 | `geohashesToConvexHull(hashes)` | Convex hull reconstruction |
 | `deduplicateGeohashes(hashes, options?)` | Remove redundant ancestors; `{ lossy: true }` merges ≥30/32 siblings |
@@ -153,6 +162,8 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 4. If result exceeds `maxCells`, `maxPrecision` is stepped down until the result fits
 5. Post-processing merges sibling sets based on `mergeThreshold` — at threshold 1.0 only complete sets (32/32), at 0.0 as few as 24/32. Result is sorted and deduplicated
 6. If no precision level fits within `maxCells`, a `RangeError` is thrown — increase `maxCells` or reduce the polygon area
+7. **Holes:** GeoJSON Polygon inner rings (holes) are respected — cells fully inside a hole are excluded, cells overlapping a hole boundary subdivide to `maxPrecision` for accuracy. Degenerate holes (< 3 vertices) are silently ignored
+8. **MultiPolygon:** `maxCells` is enforced globally across all child polygons, not per-polygon. The algorithm steps down precision until the merged result fits the budget
 
 **Memory:** `polygonToGeohashes` builds the full result array in memory. At `maxCells: 100,000` with average hash length 6, this is roughly 1–2 MB — well within typical Node.js/browser limits. For extremely large polygons (millions of cells), consider splitting the polygon into smaller regions and processing each independently.
 
