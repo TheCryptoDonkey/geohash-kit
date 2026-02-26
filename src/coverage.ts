@@ -191,8 +191,6 @@ function computeGeohashes(
 ): string[] | null {
   const result: string[] = []
   const limit = bailout ?? Infinity
-  const _minChildCount = Math.ceil(coverageThreshold * 32)
-
   // Seed: find all cells at minPrecision that overlap the polygon's bounding box
   const seed = minPrecision <= 1
     ? geohashChildren('')
@@ -202,8 +200,6 @@ function computeGeohashes(
     const b = geohashBounds(hash)
     return boundsOverlapsPolygon(b, polygon)
   })
-
-  const precisionRange = Math.max(1, maxPrecision - minPrecision)
 
   while (queue.length > 0) {
     const hash = queue.pop()!
@@ -229,10 +225,9 @@ function computeGeohashes(
         }
       }
 
-      // Depth-dependent threshold
-      const depthRatio = Math.min(1, (hash.length - minPrecision) / precisionRange)
-      const effectiveThreshold = coverageThreshold * (1 - depthRatio * depthRatio)
-      const effectiveMinCount = Math.max(2, Math.ceil(effectiveThreshold * 32))
+      // Merge decision: use the caller's threshold uniformly at all depths.
+      // maxCells auto-tightening handles cell explosion if needed.
+      const effectiveMinCount = Math.max(1, Math.ceil(coverageThreshold * 32))
 
       if (fullyInside.length >= effectiveMinCount) {
         // Enough children are fully covered — include at this precision
