@@ -197,6 +197,10 @@ export function polygonToGeohashes(
 
 /**
  * Compute geohashes covering a polygon via greedy recursive subdivision.
+ *
+ * coverageThreshold controls the minimum precision for interior cells:
+ *   1.0 → all cells at maxPrecision (tightest)
+ *   0.0 → interior cells as coarse as minPrecision (loosest)
  */
 function computeGeohashes(
   polygon: [number, number][],
@@ -207,6 +211,14 @@ function computeGeohashes(
 ): string[] | null {
   const result: string[] = []
   const limit = bailout ?? Infinity
+
+  // Interior cells must reach at least this precision before being emitted.
+  // At threshold 1.0 this equals maxPrecision (subdivide everything).
+  // At threshold 0.0 this equals minPrecision (coarsest interior cells).
+  const interiorMinPrecision = Math.ceil(
+    minPrecision + (maxPrecision - minPrecision) * coverageThreshold,
+  )
+
   // Seed: find all cells at minPrecision that overlap the polygon's bounding box
   const seed = minPrecision <= 1
     ? geohashChildren('')
@@ -222,7 +234,15 @@ function computeGeohashes(
     const b = geohashBounds(hash)
 
     if (boundsFullyInsidePolygon(b, polygon)) {
-      result.push(hash)
+      if (hash.length >= interiorMinPrecision) {
+        // At or past target interior precision — emit
+        result.push(hash)
+      } else {
+        // Not deep enough yet — subdivide further
+        for (const child of geohashChildren(hash)) {
+          queue.push(child)
+        }
+      }
     } else if (hash.length >= maxPrecision) {
       // At max precision — include any cell that overlaps the polygon.
       result.push(hash)
@@ -241,15 +261,15 @@ function computeGeohashes(
         }
       }
 
-      // Merge decision: use the caller's threshold uniformly at all depths.
-      // maxCells auto-tightening handles cell explosion if needed.
+      // Merge decision: only merge (keep parent) if we're at or past the
+      // interior target precision AND enough children are fully covered.
       const effectiveMinCount = Math.max(1, Math.ceil(coverageThreshold * 32))
 
-      if (fullyInside.length >= effectiveMinCount) {
-        // Enough children are fully covered — include at this precision
+      if (hash.length >= interiorMinPrecision && fullyInside.length >= effectiveMinCount) {
+        // Enough children are fully covered and at target depth — include at this precision
         result.push(hash)
       } else {
-        // Not enough coverage — subdivide into all overlapping children
+        // Not enough coverage or not deep enough — subdivide
         for (const child of fullyInside) {
           queue.push(child)
         }
