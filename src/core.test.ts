@@ -5,6 +5,7 @@ import {
   distance, distanceFromCoords, radiusToPrecision, precisionToRadius,
   type GeohashBounds,
 } from './core.js'
+import { expandRings } from './nostr.js'
 
 describe('encode', () => {
   it('encodes London (51.5074, -0.1278) to gcpvj at precision 5', () => {
@@ -308,4 +309,331 @@ describe('precisionToRadius', () => {
       expect(recovered).toBe(p)
     }
   })
+})
+
+// --- Fuzz / property-based tests for neighbour ---
+
+const KNOWN_COORDS: Array<{ name: string; lat: number; lon: number }> = [
+  { name: 'London', lat: 51.5074, lon: -0.1278 },
+  { name: 'New York', lat: 40.7128, lon: -74.006 },
+  { name: 'Tokyo', lat: 35.6762, lon: 139.6503 },
+  { name: 'equator/prime meridian', lat: 0, lon: 0 },
+  { name: 'near north pole', lat: 89.0, lon: 10 },
+  { name: 'near antimeridian', lat: -33.8688, lon: 179.5 },
+]
+
+const CARDINAL_DIRS = ['n', 'e', 's', 'w'] as const
+
+/** Check east/west adjacency, accounting for antimeridian wrapping. */
+function isLonAdjacent(edgeA: number, edgeB: number, tol: number): boolean {
+  // Normal case: edges are close
+  if (Math.abs(edgeA - edgeB) < tol) return true
+  // Wrapped case: edges are ~360 apart (one near 180, other near -180)
+  if (Math.abs(edgeA - edgeB + 360) < tol) return true
+  if (Math.abs(edgeA - edgeB - 360) < tol) return true
+  return false
+}
+
+/** Check if a cell is near a pole (centre ± cell height would exceed ±90). */
+function isNearPole(b: GeohashBounds): boolean {
+  const centre = (b.minLat + b.maxLat) / 2
+  const height = b.maxLat - b.minLat
+  return centre + height > 89.99999 || centre - height < -89.99999
+}
+
+describe('fuzz: adjacency invariant across precisions 1–9', () => {
+  for (const { name, lat, lon } of KNOWN_COORDS) {
+    for (let precision = 1; precision <= 9; precision++) {
+      it(`${name} at precision ${precision}`, () => {
+        const hash = encode(lat, lon, precision)
+        const original = bounds(hash)
+        const nbrs = neighbours(hash)
+        const nbValues = Object.values(nbrs)
+        const nearPole = isNearPole(original)
+
+        // All neighbours have the same precision
+        for (const nb of nbValues) {
+          expect(nb.length).toBe(precision)
+        }
+
+        if (!nearPole) {
+          // Away from poles: all 8 neighbours are distinct from each other and the original
+          expect(new Set(nbValues).size).toBe(8)
+          expect(nbValues).not.toContain(hash)
+        }
+
+        // Cardinal neighbours share a boundary edge (within tolerance)
+        const TOL = 1e-6
+
+        // North/south adjacency (skip if near pole — clamping distorts)
+        if (!nearPole) {
+          const northB = bounds(nbrs.n)
+          expect(Math.abs(northB.minLat - original.maxLat)).toBeLessThan(TOL)
+
+          const southB = bounds(nbrs.s)
+          expect(Math.abs(southB.maxLat - original.minLat)).toBeLessThan(TOL)
+        }
+
+        // East/west adjacency (handles antimeridian wrapping)
+        const eastB = bounds(nbrs.e)
+        expect(isLonAdjacent(eastB.minLon, original.maxLon, TOL)).toBe(true)
+
+        const westB = bounds(nbrs.w)
+        expect(isLonAdjacent(westB.maxLon, original.minLon, TOL)).toBe(true)
+      })
+    }
+  }
+})
+
+describe('fuzz: round-trip consistency (inverse neighbour)', () => {
+  const INVERSE_PAIRS: Array<[Direction, Direction]> = [
+    ['n', 's'],
+    ['s', 'n'],
+    ['e', 'w'],
+    ['w', 'e'],
+    ['ne', 'sw'],
+    ['sw', 'ne'],
+    ['nw', 'se'],
+    ['se', 'nw'],
+  ]
+
+  for (const { name, lat, lon } of KNOWN_COORDS) {
+    for (let precision = 1; precision <= 9; precision++) {
+      const hash = encode(lat, lon, precision)
+      const b = bounds(hash)
+
+      // Skip combos where pole clamping would break the round-trip
+      if (isNearPole(b)) continue
+
+      for (const [dir, inverse] of INVERSE_PAIRS) {
+        it(`${name} p${precision}: ${dir} then ${inverse} returns to original`, () => {
+          const moved = neighbour(hash, dir)
+          const returned = neighbour(moved, inverse)
+          expect(returned).toBe(hash)
+        })
+      }
+    }
+  }
+})
+
+describe('fuzz: pole boundary behaviour', () => {
+  const POLE_COORDS = [
+    { name: 'near north pole', lat: 89.9, lon: 0 },
+    { name: 'near north pole (east)', lat: 89.9, lon: 90 },
+    { name: 'near south pole', lat: -89.9, lon: 0 },
+    { name: 'near south pole (west)', lat: -89.9, lon: -90 },
+  ]
+
+  for (const { name, lat, lon } of POLE_COORDS) {
+    for (let precision = 1; precision <= 7; precision++) {
+      it(`${name} at precision ${precision}: neighbours produce valid geohashes`, () => {
+        const hash = encode(lat, lon, precision)
+        const nbrs = neighbours(hash)
+        const nbValues = Object.values(nbrs)
+
+        // All neighbours are valid geohashes of correct length
+        for (const nb of nbValues) {
+          expect(nb.length).toBe(precision)
+        }
+
+        // East/west neighbours should always differ from original
+        expect(nbrs.e).not.toBe(hash)
+        expect(nbrs.w).not.toBe(hash)
+
+        // Near poles, north/south may clamp back to same cell — that's OK.
+        // At higher precisions where cells are small, they should differ.
+        const b = bounds(hash)
+        if (!isNearPole(b)) {
+          expect(nbrs.n).not.toBe(hash)
+          expect(nbrs.s).not.toBe(hash)
+        }
+      })
+
+      it(`${name} at precision ${precision}: clamped latitude produces valid bounds`, () => {
+        const hash = encode(lat, lon, precision)
+        const dir = lat > 0 ? 'n' as const : 's' as const
+        const extreme = neighbour(hash, dir)
+        const b = bounds(extreme)
+
+        // Bounds should be valid (min < max)
+        expect(b.minLat).toBeLessThan(b.maxLat)
+        expect(b.minLon).toBeLessThan(b.maxLon)
+
+        // Latitude should stay within valid range
+        expect(b.minLat).toBeGreaterThanOrEqual(-90)
+        expect(b.maxLat).toBeLessThanOrEqual(90)
+      })
+    }
+  }
+})
+
+describe('fuzz: antimeridian wrapping (both directions)', () => {
+  const ANTIMERIDIAN_CASES = [
+    { name: 'east wrapping (equator)', lat: 0, lon: 179.99 },
+    { name: 'east wrapping (mid-lat)', lat: 45, lon: 179.95 },
+    { name: 'west wrapping (equator)', lat: 0, lon: -179.99 },
+    { name: 'west wrapping (mid-lat)', lat: -30, lon: -179.95 },
+  ]
+
+  for (const { name, lat, lon } of ANTIMERIDIAN_CASES) {
+    for (let precision = 1; precision <= 7; precision++) {
+      it(`${name} at precision ${precision}`, () => {
+        const hash = encode(lat, lon, precision)
+        const original = bounds(hash)
+
+        if (lon > 0) {
+          // Near +180: east neighbour should wrap to negative longitude
+          const e = neighbour(hash, 'e')
+          const eb = bounds(e)
+          expect(e.length).toBe(precision)
+
+          // Either adjacent normally or wrapped around the antimeridian
+          expect(isLonAdjacent(eb.minLon, original.maxLon, 1e-6)).toBe(true)
+
+          // If the cell actually touches the antimeridian, verify the wrap
+          if (original.maxLon >= 180 - 1e-6) {
+            expect(eb.maxLon).toBeLessThan(0)
+          }
+        } else {
+          // Near -180: west neighbour should wrap to positive longitude
+          const w = neighbour(hash, 'w')
+          const wb = bounds(w)
+          expect(w.length).toBe(precision)
+
+          expect(isLonAdjacent(wb.maxLon, original.minLon, 1e-6)).toBe(true)
+
+          // If the cell actually touches the antimeridian, verify the wrap
+          if (original.minLon <= -180 + 1e-6) {
+            expect(wb.minLon).toBeGreaterThan(0)
+          }
+        }
+      })
+    }
+  }
+})
+
+describe('fuzz: diagonal neighbour bounds verification', () => {
+  const DIAG_COORDS = [
+    { name: 'London', lat: 51.5074, lon: -0.1278 },
+    { name: 'equator', lat: 5, lon: 5 },
+    { name: 'southern hemisphere', lat: -33.8688, lon: 151.2093 },
+  ]
+
+  for (const { name, lat, lon } of DIAG_COORDS) {
+    for (let precision = 2; precision <= 7; precision++) {
+      it(`${name} at precision ${precision}: diagonals share a corner`, () => {
+        const hash = encode(lat, lon, precision)
+        const orig = bounds(hash)
+        const nbrs = neighbours(hash)
+        const TOL = 1e-6
+
+        // NE shares top-right corner: NE.minLat ≈ orig.maxLat, NE.minLon ≈ orig.maxLon
+        const ne = bounds(nbrs.ne)
+        expect(Math.abs(ne.minLat - orig.maxLat)).toBeLessThan(TOL)
+        expect(isLonAdjacent(ne.minLon, orig.maxLon, TOL)).toBe(true)
+
+        // SE shares bottom-right corner: SE.maxLat ≈ orig.minLat, SE.minLon ≈ orig.maxLon
+        const se = bounds(nbrs.se)
+        expect(Math.abs(se.maxLat - orig.minLat)).toBeLessThan(TOL)
+        expect(isLonAdjacent(se.minLon, orig.maxLon, TOL)).toBe(true)
+
+        // SW shares bottom-left corner: SW.maxLat ≈ orig.minLat, SW.maxLon ≈ orig.minLon
+        const sw = bounds(nbrs.sw)
+        expect(Math.abs(sw.maxLat - orig.minLat)).toBeLessThan(TOL)
+        expect(isLonAdjacent(sw.maxLon, orig.minLon, TOL)).toBe(true)
+
+        // NW shares top-left corner: NW.minLat ≈ orig.maxLat, NW.maxLon ≈ orig.minLon
+        const nw = bounds(nbrs.nw)
+        expect(Math.abs(nw.minLat - orig.maxLat)).toBeLessThan(TOL)
+        expect(isLonAdjacent(nw.maxLon, orig.minLon, TOL)).toBe(true)
+      })
+    }
+  }
+})
+
+describe('fuzz: high-precision sweep (precisions 7, 8, 9)', () => {
+  // Grid: latitudes -60 to 60 (step 20), longitudes -170 to 170 (step 40)
+  const lats = [-60, -40, -20, 0, 20, 40, 60]
+  const lons = [-170, -130, -90, -50, -10, 30, 70, 110, 150, 170]
+
+  for (const precision of [7, 8, 9]) {
+    it(`precision ${precision}: adjacency holds across ${lats.length * lons.length} coordinates`, () => {
+      const TOL = 1e-6
+
+      for (const lat of lats) {
+        for (const lon of lons) {
+          const hash = encode(lat, lon, precision)
+          const orig = bounds(hash)
+          const nbrs = neighbours(hash)
+
+          // All neighbours have correct precision
+          for (const nb of Object.values(nbrs)) {
+            expect(nb.length).toBe(precision)
+          }
+
+          // All 8 are distinct (no pole clamping at these latitudes)
+          const nbValues = Object.values(nbrs)
+          expect(new Set(nbValues).size).toBe(8)
+          expect(nbValues).not.toContain(hash)
+
+          // North/south adjacency
+          const northB = bounds(nbrs.n)
+          expect(Math.abs(northB.minLat - orig.maxLat)).toBeLessThan(TOL)
+          const southB = bounds(nbrs.s)
+          expect(Math.abs(southB.maxLat - orig.minLat)).toBeLessThan(TOL)
+
+          // East/west adjacency (handles antimeridian)
+          const eastB = bounds(nbrs.e)
+          expect(isLonAdjacent(eastB.minLon, orig.maxLon, TOL)).toBe(true)
+          const westB = bounds(nbrs.w)
+          expect(isLonAdjacent(westB.maxLon, orig.minLon, TOL)).toBe(true)
+
+          // Round-trip
+          expect(neighbour(nbrs.n, 's')).toBe(hash)
+          expect(neighbour(nbrs.s, 'n')).toBe(hash)
+          expect(neighbour(nbrs.e, 'w')).toBe(hash)
+          expect(neighbour(nbrs.w, 'e')).toBe(hash)
+        }
+      }
+    })
+  }
+})
+
+describe('fuzz: ring expansion gap detection', () => {
+  const RING_COORDS = [
+    { name: 'London', lat: 51.5074, lon: -0.1278 },
+    { name: 'equator', lat: 5, lon: 5 },
+    { name: 'Tokyo', lat: 35.6762, lon: 139.6503 },
+    { name: 'southern hemisphere', lat: -33.8688, lon: 151.2093 },
+  ]
+
+  for (const { name, lat, lon } of RING_COORDS) {
+    it(`${name} at precision 7: 2 rings produce a contiguous 5×5 grid`, () => {
+      const hash = encode(lat, lon, 7)
+      const rings = expandRings(hash, 2)
+      const allCells = new Set(rings.flat())
+
+      // 2 rings around a centre = 5×5 grid = 25 cells
+      expect(allCells.size).toBe(25)
+
+      // Ring 0 = 1 cell, Ring 1 = 8 cells, Ring 2 = 16 cells
+      expect(rings[0]).toHaveLength(1)
+      expect(rings[1]).toHaveLength(8)
+      expect(rings[2]).toHaveLength(16)
+
+      // Every cell's neighbours that are within 2 cells of the centre
+      // should also be in the set — i.e. no internal gaps.
+      // Verify by checking that ring-1 cells are all neighbours of centre.
+      const centreNbrs = neighbours(hash)
+      const ring1Set = new Set(rings[1])
+      for (const nb of Object.values(centreNbrs)) {
+        expect(ring1Set.has(nb)).toBe(true)
+      }
+
+      // All cells should have correct precision
+      for (const cell of allCells) {
+        expect(cell.length).toBe(7)
+      }
+    })
+  }
 })
