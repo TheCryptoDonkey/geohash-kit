@@ -380,6 +380,16 @@ describe('radiusToPrecision', () => {
   })
 })
 
+describe('precisionToRadius — input validation', () => {
+  it('throws RangeError for NaN', () => {
+    expect(() => precisionToRadius(NaN)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for Infinity', () => {
+    expect(() => precisionToRadius(Infinity)).toThrow(RangeError)
+  })
+})
+
 describe('precisionToRadius', () => {
   it('returns large radius for precision 1', () => {
     expect(precisionToRadius(1)).toBeGreaterThan(2_000_000)

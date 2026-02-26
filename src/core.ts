@@ -208,6 +208,7 @@ export function radiusToPrecision(metres: number): number {
 
 /** Approximate cell radius in metres for a given precision level. */
 export function precisionToRadius(precision: number): number {
+  if (!Number.isFinite(precision)) throw new RangeError(`Invalid precision: ${precision}`)
   const p = Math.max(1, Math.min(9, Math.round(precision)))
   return PRECISION_RADIUS_M[p]
 }

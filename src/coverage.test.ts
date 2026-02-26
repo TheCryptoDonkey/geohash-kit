@@ -412,19 +412,17 @@ describe('geohashesToConvexHull', () => {
 })
 
 describe('geohashesToConvexHull — antimeridian', () => {
-  it('produces a tight hull for hashes straddling the antimeridian', () => {
-    // Hashes on both sides of the antimeridian (+179 and -179)
+  it('throws for hashes straddling the antimeridian', () => {
     const hashEast = encode(0, 179.5, 3)
     const hashWest = encode(0, -179.5, 3)
-    const hull = geohashesToConvexHull([hashEast, hashWest])
+    expect(() => geohashesToConvexHull([hashEast, hashWest])).toThrow(/antimeridian/)
+  })
 
-    // Hull should be tight (span < 30° of longitude around the antimeridian),
-    // NOT a globe-spanning hull (span ~359°).
-    // For antimeridian-crossing hulls, the planar span is ~360 minus the actual span.
-    const lons = hull.map((v) => v[0])
-    const planarSpan = Math.max(...lons) - Math.min(...lons)
-    const lonSpan = planarSpan > 180 ? 360 - planarSpan : planarSpan
-    expect(lonSpan).toBeLessThan(30)
+  it('does not throw for hashes near but not straddling antimeridian', () => {
+    // Both hashes on the eastern side of the antimeridian
+    const h1 = encode(0, 170, 3)
+    const h2 = encode(0, 175, 3)
+    expect(() => geohashesToConvexHull([h1, h2])).not.toThrow()
   })
 })
 

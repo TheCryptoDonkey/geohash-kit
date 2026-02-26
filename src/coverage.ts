@@ -162,9 +162,7 @@ export interface CoverageOptions {
  * the given minPrecision.
  *
  * **Antimeridian:** polygons crossing ±180° longitude are not supported.
- * Hulls produced by `geohashesToConvexHull` for antimeridian-straddling
- * hash sets will cross the dateline and cannot be used as input here.
- * Split such polygons at the antimeridian and cover each half separately.
+ * Split at the antimeridian and cover each half separately.
  */
 export function polygonToGeohashes(
   polygon: [number, number][],
@@ -349,11 +347,10 @@ function cross2D(o: [number, number], a: [number, number], b: [number, number]):
  * Andrew's monotone chain algorithm.
  * Returns `[lon, lat][]`.
  *
- * **Antimeridian:** handles hashes straddling ±180° by normalising
- * longitudes internally. The returned hull may contain coordinates on
- * both sides of the dateline (e.g. `[179, …]` and `[-179, …]`).
- * Such hulls cannot be passed directly to `polygonToGeohashes`, which
- * rejects antimeridian-crossing polygons. Split at the antimeridian first.
+ * **Antimeridian:** throws if the input hashes straddle ±180° longitude.
+ * Dateline-crossing hulls cannot be consumed by planar geometry functions
+ * (`pointInPolygon`, `polygonToGeohashes`). Split hash sets at the
+ * antimeridian and compute separate hulls for each side.
  */
 export function geohashesToConvexHull(hashes: string[]): [number, number][] {
   if (hashes.length === 0) return []
@@ -381,16 +378,14 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
 
   if (points.length < 3) return points
 
-  // Detect antimeridian straddling: points on both sides with a wide gap
+  // Guard: antimeridian-straddling hashes produce hulls that break planar geometry
   const hasEast = points.some(p => p[0] > 90)
   const hasWest = points.some(p => p[0] < -90)
-  const straddlesAntimeridian = hasEast && hasWest
-
-  // Shift negative longitudes to [180, 360] range to keep points contiguous
-  if (straddlesAntimeridian) {
-    for (const p of points) {
-      if (p[0] < 0) p[0] += 360
-    }
+  if (hasEast && hasWest) {
+    throw new Error(
+      'Geohashes straddle the antimeridian (±180° longitude). ' +
+      'Split into separate sets and compute hulls independently.',
+    )
   }
 
   // Sort by x then y
@@ -419,16 +414,7 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
   lower.pop()
   upper.pop()
 
-  const hull = [...lower, ...upper]
-
-  // Shift longitudes back to [-180, 180] range
-  if (straddlesAntimeridian) {
-    for (const p of hull) {
-      if (p[0] > 180) p[0] -= 360
-    }
-  }
-
-  return hull
+  return [...lower, ...upper]
 }
 
 // --- deduplicateGeohashes ---
