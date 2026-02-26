@@ -208,6 +208,16 @@ function computeGeohashes(
   const result: string[] = []
   const limit = bailout ?? Infinity
 
+  // Pre-compute polygon AABB for fast rejection.
+  let polyMinLon = Infinity, polyMaxLon = -Infinity
+  let polyMinLat = Infinity, polyMaxLat = -Infinity
+  for (const [lon, lat] of polygon) {
+    if (lon < polyMinLon) polyMinLon = lon
+    if (lon > polyMaxLon) polyMaxLon = lon
+    if (lat < polyMinLat) polyMinLat = lat
+    if (lat > polyMaxLat) polyMaxLat = lat
+  }
+
   // Interior cells must reach at least this precision before being emitted.
   // At threshold 1.0 → all cells at maxPrecision (uniform).
   // At threshold 0.0 → interior cells as coarse as minPrecision.
@@ -215,10 +225,11 @@ function computeGeohashes(
     minPrecision + (maxPrecision - minPrecision) * coverageThreshold,
   )
 
-  // Seed: precision-1 cells filtered by polygon overlap.
-  // BFS naturally subdivides into deeper precisions as needed.
+  // Seed: precision-1 cells filtered by AABB then polygon overlap.
   const queue = geohashChildren('').filter((hash) => {
     const b = geohashBounds(hash)
+    if (b.maxLon < polyMinLon || b.minLon > polyMaxLon ||
+        b.maxLat < polyMinLat || b.minLat > polyMaxLat) return false
     return boundsOverlapsPolygon(b, polygon)
   })
 
@@ -228,22 +239,20 @@ function computeGeohashes(
 
     if (boundsFullyInsidePolygon(b, polygon)) {
       if (hash.length >= interiorMinPrecision) {
-        // At or past interior target — emit.
         result.push(hash)
       } else {
-        // Not deep enough — subdivide further.
         for (const child of geohashChildren(hash)) {
           queue.push(child)
         }
       }
     } else if (hash.length >= maxPrecision) {
-      // At max precision — include any cell that overlaps the polygon.
       result.push(hash)
     } else {
-      // Partially overlapping — subdivide. Fully-inside children are emitted
-      // if they meet the interior depth requirement, otherwise subdivided further.
       for (const child of geohashChildren(hash)) {
         const cb = geohashBounds(child)
+        // Fast AABB rejection before expensive polygon checks
+        if (cb.maxLon < polyMinLon || cb.minLon > polyMaxLon ||
+            cb.maxLat < polyMinLat || cb.minLat > polyMaxLat) continue
         if (boundsFullyInsidePolygon(cb, polygon)) {
           if (child.length >= interiorMinPrecision) {
             result.push(child)
