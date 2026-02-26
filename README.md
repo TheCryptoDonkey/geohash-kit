@@ -248,3 +248,7 @@ See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-
 ## Licence
 
 [MIT](./LICENSE)
+
+## Support
+
+For issues and feature requests, see [GitHub Issues](https://github.com/TheCryptoDonkey/geohash-kit/issues).
