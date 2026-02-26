@@ -74,7 +74,6 @@ header {
   cursor: pointer;
   font-size: 0.85rem;
   font-family: var(--font);
-  transition: background 0.15s;
 }
 
 .tab:hover { background: var(--border); }
@@ -152,7 +151,6 @@ aside#panel {
 .code-block .str { color: #a5d6a7; }
 .code-block .num { color: #ffcc80; }
 .code-block .kw { color: #ce93d8; }
-.code-block .fn { color: #81d4fa; }
 
 /* --- Controls --- */
 input[type="range"] {
