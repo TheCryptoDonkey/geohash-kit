@@ -2,6 +2,18 @@
 
 import { encode, neighbours, radiusToPrecision } from './core.js'
 
+// --- Validation ---
+
+const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+
+function isValidGeohash(hash: string): boolean {
+  if (hash.length === 0) return false
+  for (const ch of hash) {
+    if (!BASE32.includes(ch)) return false
+  }
+  return true
+}
+
 // --- Publishing (event tags) ---
 
 /** Generate multi-precision g-tag ladder for Nostr event publishing. */
@@ -15,10 +27,14 @@ export function createGTagLadder(geohash: string, minPrecision = 1): string[][] 
 
 // --- Parsing ---
 
-/** Extract and parse g tags from a Nostr event's tag array. */
+/**
+ * Extract and parse g tags from a Nostr event's tag array.
+ * Invalid geohashes (containing non-base32 characters) are silently filtered out,
+ * since relay data is untrusted. Empty strings are also excluded.
+ */
 export function parseGTags(tags: string[][]): Array<{ geohash: string; precision: number }> {
   return tags
-    .filter((t) => t[0] === 'g' && t[1] && t[1].length > 0)
+    .filter((t) => t[0] === 'g' && t[1] && isValidGeohash(t[1]))
     .map((t) => ({ geohash: t[1], precision: t[1].length }))
 }
 

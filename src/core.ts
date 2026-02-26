@@ -59,6 +59,7 @@ export function encode(lat: number, lon: number, precision = 5): string {
 
 /** Decode a geohash to its centre point with error margins. */
 export function decode(hash: string): { lat: number; lon: number; error: { lat: number; lon: number } } {
+  if (hash.length === 0) throw new TypeError('Cannot decode an empty geohash')
   const b = bounds(hash)
   return {
     lat: (b.minLat + b.maxLat) / 2,
