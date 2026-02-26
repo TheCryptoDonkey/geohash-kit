@@ -221,6 +221,21 @@ import { encode, decode, bounds, neighbours } from 'geohash-kit'
 - **British English** — `neighbours` not `neighbors`, `neighbour` not `neighbor`
 - **Structured returns** — named object properties instead of positional arrays
 
+## Benchmarking
+
+geohash-kit includes comprehensive performance benchmarks for all major functions. Run them with:
+
+```bash
+npm run bench
+```
+
+Performance summary:
+- **Core functions** (encode, decode, bounds, etc.): >5M ops/sec, all sub-100µs
+- **`polygonToGeohashes`** (the main workhorse): 282–7,230 ops/sec depending on polygon size and precision
+- **Nostr functions** (tag ladders, filters): 256k–10M ops/sec
+
+For detailed performance analysis, device comparisons, and optimization guidance, see [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
+
 ## For AI Assistants
 
 See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-full.txt) for the complete reference with examples.
