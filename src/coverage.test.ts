@@ -233,17 +233,21 @@ describe('greedy multi-precision coverage', () => {
     expect(minPrecision).toBeLessThanOrEqual(2)
   })
 
-  it('at threshold 1 all cells are at maxPrecision', () => {
-    const small: [number, number][] = [
-      [-0.15, 51.50],
-      [-0.10, 51.50],
-      [-0.10, 51.52],
-      [-0.15, 51.52],
+  it('at threshold 1 edge cells reach maxPrecision but interior cells are coarse', () => {
+    const poly: [number, number][] = [
+      [-0.20, 51.45],
+      [-0.05, 51.45],
+      [-0.05, 51.55],
+      [-0.20, 51.55],
     ]
-    const result = polygonToGeohashes(small, { maxPrecision: 6, mergeThreshold: 1.0 })
+    const result = polygonToGeohashes(poly, { maxPrecision: 7, mergeThreshold: 1.0, maxCells: 50000 })
     const precisions = new Set(result.map((h) => h.length))
-    expect(precisions.size).toBe(1)
-    expect([...precisions][0]).toBe(6)
+    // Multi-precision: coarse interior + fine edges
+    expect(precisions.size).toBeGreaterThanOrEqual(2)
+    // Edge cells reach maxPrecision
+    expect(Math.max(...result.map((h) => h.length))).toBe(7)
+    // Interior cells are coarser than maxPrecision
+    expect(Math.min(...result.map((h) => h.length))).toBeLessThan(7)
   })
 
   it('no geohash is an ancestor of another', () => {
