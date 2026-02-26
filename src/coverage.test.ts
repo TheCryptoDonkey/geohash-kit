@@ -542,6 +542,36 @@ describe('polygonToGeohashes — GeoJSON input', () => {
     const fromGeoJSON = polygonToGeohashes(geojsonPolygon)
     expect(fromGeoJSON).toEqual(fromCoords)
   })
+
+  it('strips closing vertex from GeoJSON Polygon ring', () => {
+    // GeoJSON rings are closed (first === last); we must strip the duplicate
+    const closed = {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52], [-0.15, 51.50],
+      ]],
+    }
+    const open = {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52],
+      ]],
+    }
+    expect(polygonToGeohashes(closed)).toEqual(polygonToGeohashes(open))
+  })
+
+  it('throws for GeoJSON Polygon with empty coordinates', () => {
+    const empty = { type: 'Polygon' as const, coordinates: [] as number[][][] }
+    expect(() => polygonToGeohashes(empty)).toThrow(/no outer ring/)
+  })
+
+  it('throws for GeoJSON Polygon with degenerate ring (< 3 vertices)', () => {
+    const degenerate = {
+      type: 'Polygon' as const,
+      coordinates: [[[-0.15, 51.50], [-0.10, 51.50]]],
+    }
+    expect(() => polygonToGeohashes(degenerate)).toThrow(/at least 3/)
+  })
 })
 
 describe('deduplicateGeohashes', () => {
