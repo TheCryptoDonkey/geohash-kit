@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>geohash-kit — Interactive Demo</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>geohash-kit</h1>
+      <p class="tagline">Modern TypeScript geohash toolkit</p>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="explore">Explore</button>
+      <button class="tab" data-tab="cover">Cover</button>
+      <button class="tab" data-tab="nostr">Nostr</button>
+    </nav>
+    <div class="header-links">
+      <a href="https://www.npmjs.com/package/geohash-kit" target="_blank" rel="noopener">npm</a>
+      <a href="https://github.com/TheCryptoDonkey/geohash-kit" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <div id="map"></div>
+
+    <aside id="panel">
+      <!-- Explore panel -->
+      <div class="panel-content" data-panel="explore">
+        <h2>Explore</h2>
+        <p class="hint">Click anywhere on the map to encode a geohash.</p>
+        <div id="explore-info" class="hidden">
+          <div class="field">
+            <label>Geohash</label>
+            <span id="explore-hash" class="mono"></span>
+          </div>
+          <div class="field">
+            <label>Decoded</label>
+            <span id="explore-decoded" class="mono"></span>
+          </div>
+          <div class="field">
+            <label>Error</label>
+            <span id="explore-error" class="mono"></span>
+          </div>
+          <div class="field">
+            <label>Precision</label>
+            <select id="explore-precision">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5" selected>5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+          <div class="code-block" id="explore-code"></div>
+        </div>
+      </div>
+
+      <!-- Cover panel -->
+      <div class="panel-content hidden" data-panel="cover">
+        <h2>Cover</h2>
+        <p class="hint">Draw a polygon on the map using the toolbar.</p>
+        <div id="cover-info" class="hidden">
+          <div class="field">
+            <label>Cells</label>
+            <span id="cover-count" class="mono"></span>
+          </div>
+          <div class="field">
+            <label>Precision range</label>
+            <span id="cover-range" class="mono"></span>
+          </div>
+          <div class="field">
+            <label>Max cells</label>
+            <input type="range" id="cover-max-cells" min="50" max="2000" value="500" step="50" />
+            <span id="cover-max-cells-value" class="mono">500</span>
+          </div>
+          <div class="field">
+            <label>Merge threshold</label>
+            <input type="range" id="cover-merge" min="0" max="1" value="0.5" step="0.1" />
+            <span id="cover-merge-value" class="mono">0.5</span>
+          </div>
+          <div class="code-block" id="cover-code"></div>
+        </div>
+        <button id="cover-clear" class="btn hidden">Clear polygon</button>
+      </div>
+
+      <!-- Nostr panel -->
+      <div class="panel-content hidden" data-panel="nostr">
+        <h2>Nostr</h2>
+        <p class="hint">Click anywhere on the map to generate Nostr tags.</p>
+        <div id="nostr-info" class="hidden">
+          <div class="field">
+            <label>g-tag ladder</label>
+            <div class="code-block" id="nostr-ladder"></div>
+          </div>
+          <div class="field">
+            <label>REQ filter</label>
+            <div class="code-block" id="nostr-filter"></div>
+          </div>
+          <div class="field">
+            <label>Rings</label>
+            <input type="range" id="nostr-rings" min="1" max="3" value="1" step="1" />
+            <span id="nostr-rings-value" class="mono">1</span>
+          </div>
+          <div class="field">
+            <label>Radius (m)</label>
+            <input type="number" id="nostr-radius" value="5000" min="100" max="100000" step="100" />
+          </div>
+          <div class="code-block" id="nostr-code"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    Powered by <a href="https://www.npmjs.com/package/geohash-kit" target="_blank" rel="noopener">geohash-kit</a>
+    · <a href="https://github.com/TheCryptoDonkey/geohash-kit" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <!-- App -->
+  <script type="module" src="demo.js"></script>
+</body>
+</html>
