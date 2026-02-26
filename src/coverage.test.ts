@@ -541,4 +541,40 @@ describe('deduplicateGeohashes', () => {
     const result = deduplicateGeohashes(['gcpvj', 'gcpvm', 'u10hf'])
     expect(result).toEqual(['gcpvj', 'gcpvm', 'u10hf'])
   })
+
+  it('does not merge near-complete sibling sets by default (exact mode)', () => {
+    const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+    const parent = 'gcp'
+    const kids = [...BASE32].map(ch => parent + ch).slice(0, 30)
+    const result = deduplicateGeohashes(kids)
+    expect(result).toHaveLength(30)
+    expect(result).not.toContain(parent)
+  })
+
+  it('merges all 32 siblings into parent in exact mode', () => {
+    const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+    const parent = 'gcp'
+    const allKids = [...BASE32].map(ch => parent + ch)
+    const result = deduplicateGeohashes(allKids)
+    expect(result).toHaveLength(1)
+    expect(result).toContain(parent)
+  })
+
+  it('merges near-complete sibling sets (30/32) when lossy: true', () => {
+    const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+    const parent = 'gcp'
+    const kids = [...BASE32].map(ch => parent + ch).slice(0, 30)
+    const result = deduplicateGeohashes(kids, { lossy: true })
+    expect(result).toHaveLength(1)
+    expect(result).toContain(parent)
+  })
+
+  it('does not merge 29/32 siblings even when lossy: true', () => {
+    const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+    const parent = 'gcp'
+    const kids = [...BASE32].map(ch => parent + ch).slice(0, 29)
+    const result = deduplicateGeohashes(kids, { lossy: true })
+    expect(result).toHaveLength(29)
+    expect(result).not.toContain(parent)
+  })
 })

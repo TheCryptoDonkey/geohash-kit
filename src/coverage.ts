@@ -300,10 +300,10 @@ function computeGeohashes(
 }
 
 /**
- * Post-processing merge: bottom-up consolidation of near-complete sibling sets.
- * When at least `minSiblings` (default 31) of 32 children of a parent are present,
- * replace them with the parent. This trades a tiny boundary overshoot (at most one
- * extra cell per merge) for a significantly smaller result array.
+ * Post-processing merge: bottom-up consolidation of sibling sets.
+ * When at least `minSiblings` of 32 children of a parent are present,
+ * replace them with the parent. With `minSiblings < 32` this trades a
+ * tiny boundary overshoot for a significantly smaller result array.
  * Iterates from finest to coarsest so merges can cascade.
  */
 function mergeCompleteSiblings(hashes: string[], minPrecision: number, minSiblings = 30): string[] {
@@ -433,13 +433,21 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
 
 // --- deduplicateGeohashes ---
 
+export interface DeduplicateOptions {
+  /**
+   * Allow near-complete sibling merges (30/32) for a smaller result array.
+   * Trades a tiny boundary overshoot for fewer cells. Default: `false` (exact).
+   */
+  lossy?: boolean
+}
+
 /**
- * Remove redundant geohashes and merge complete sibling groups.
+ * Remove redundant geohashes and merge sibling groups.
  * 1. Remove any geohash whose ancestor (shorter prefix) is already in the set.
- * 2. Merge complete sibling sets (all 32 children → parent) bottom-up.
- * Optimises for the smallest possible array.
+ * 2. Merge sibling sets bottom-up — exact (all 32) by default, or
+ *    near-complete (≥30/32) when `lossy: true`.
  */
-export function deduplicateGeohashes(hashes: string[]): string[] {
+export function deduplicateGeohashes(hashes: string[], options: DeduplicateOptions = {}): string[] {
   // Step 1: remove children when ancestor is present
   const set = new Set(hashes)
   const filtered = Array.from(set).filter((h) => {
@@ -449,8 +457,9 @@ export function deduplicateGeohashes(hashes: string[]): string[] {
     return true
   })
 
-  // Step 2: merge complete sibling groups bottom-up
-  return mergeCompleteSiblings(filtered, 1).sort()
+  // Step 2: merge sibling groups bottom-up
+  const minSiblings = options.lossy ? 30 : 32
+  return mergeCompleteSiblings(filtered, 1, minSiblings).sort()
 }
 
 // --- geohashesToGeoJSON ---

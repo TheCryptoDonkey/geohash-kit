@@ -121,7 +121,7 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 | `polygonToGeohashes(polygon, options?)` | Adaptive threshold polygon coverage |
 | `geohashesToGeoJSON(hashes)` | GeoJSON FeatureCollection for map rendering |
 | `geohashesToConvexHull(hashes)` | Convex hull reconstruction |
-| `deduplicateGeohashes(hashes)` | Remove redundant ancestors |
+| `deduplicateGeohashes(hashes, options?)` | Remove redundant ancestors; `{ lossy: true }` merges ≥30/32 siblings |
 | `pointInPolygon(point, polygon)` | Ray-casting point-in-polygon test |
 | `boundsOverlapsPolygon(bounds, polygon)` | Bounds–polygon overlap test |
 | `boundsFullyInsidePolygon(bounds, polygon)` | Bounds fully inside polygon test |
@@ -148,7 +148,7 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 2. For each cell: fully inside → emit (if deep enough); at max precision → emit if overlaps; partial → subdivide children
 3. `mergeThreshold` controls interior cell granularity: 1.0 = uniform max precision, 0.0 = coarsest fully-inside cells
 4. If result exceeds `maxCells`, `maxPrecision` is stepped down until the result fits
-5. Post-processing merges near-complete sibling sets (≥30 of 32 children → parent). Result is sorted and deduplicated
+5. Post-processing merges sibling sets based on `mergeThreshold` — at threshold 1.0 only complete sets (32/32), at 0.0 as few as 24/32. Result is sorted and deduplicated
 6. If no precision level fits within `maxCells`, a `RangeError` is thrown — increase `maxCells` or reduce the polygon area
 
 ## Comparison
