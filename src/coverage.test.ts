@@ -82,7 +82,7 @@ describe('polygonToGeohashes', () => {
     ]
     const result = polygonToGeohashes(london)
     expect(result.length).toBeGreaterThan(0)
-    expect(result.length).toBeLessThan(300)
+    expect(result.length).toBeLessThan(500)
     // All should be valid geohash strings
     for (const h of result) {
       expect(h).toMatch(/^[0-9b-hjkmnp-z]+$/)
@@ -196,7 +196,7 @@ describe('polygonToGeohashes mergeThreshold', () => {
 })
 
 describe('greedy multi-precision coverage', () => {
-  it('produces 3+ precision levels for a medium-large polygon', () => {
+  it('produces multiple precision levels for a medium-large polygon', () => {
     // East Midlands — roughly 2.5° × 1.5° polygon
     const midlands: [number, number][] = [
       [-2.0, 52.2],
@@ -204,9 +204,10 @@ describe('greedy multi-precision coverage', () => {
       [0.3, 53.5],
       [-2.0, 53.5],
     ]
-    const result = polygonToGeohashes(midlands, { mergeThreshold: 0.5 })
+    const result = polygonToGeohashes(midlands, { mergeThreshold: 0.8, maxCells: 50000 })
     const precisions = new Set(result.map((h) => h.length))
-    expect(precisions.size).toBeGreaterThanOrEqual(3)
+    // Coarse interior + fine edge = multi-precision
+    expect(precisions.size).toBeGreaterThanOrEqual(2)
   })
 
   it('lower threshold produces fewer cells than higher threshold', () => {

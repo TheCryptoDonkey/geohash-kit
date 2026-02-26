@@ -198,11 +198,12 @@ export function polygonToGeohashes(
 /**
  * Compute geohashes covering a polygon via greedy recursive subdivision.
  *
- * Fully-inside cells are always emitted at the coarsest precision that fits
- * (big blocks in the interior). coverageThreshold controls edge behaviour:
- * it sets the minimum precision at which partially-overlapping cells can be
- * merged to their parent, preventing coarse blocks from sticking out of the
- * polygon boundary.
+ * - Fully-inside cells emit at the coarsest precision that fits (big interior blocks).
+ * - Partially-overlapping cells subdivide until edgeMaxPrecision (tight edges).
+ * - coverageThreshold scales edgeMaxPrecision between minPrecision and maxPrecision.
+ *   1.0 → edges at maxPrecision (tightest). 0.0 → edges at minPrecision (loosest).
+ * - No merge of partially-overlapping cells — only fully-inside cells are emitted
+ *   below maxPrecision, so no blocks stick outside the polygon boundary.
  */
 function computeGeohashes(
   polygon: [number, number][],
@@ -214,12 +215,9 @@ function computeGeohashes(
   const result: string[] = []
   const limit = bailout ?? Infinity
 
-  // Edge cells must reach at least this precision before merging is allowed.
-  // This prevents partially-overlapping cells from merging at coarse precision
-  // (which would create big blocks sticking outside the polygon).
-  // At threshold 1.0: edgeMinPrecision = maxPrecision (never merge edge cells)
-  // At threshold 0.0: edgeMinPrecision = minPrecision (merge as early as possible)
-  const edgeMinPrecision = Math.ceil(
+  // Edge precision: how far partially-overlapping cells subdivide.
+  // At threshold 1.0 → edges at maxPrecision. At 0.0 → edges at minPrecision.
+  const edgeMaxPrecision = Math.ceil(
     minPrecision + (maxPrecision - minPrecision) * coverageThreshold,
   )
 
@@ -239,41 +237,18 @@ function computeGeohashes(
 
     if (boundsFullyInsidePolygon(b, polygon)) {
       // Fully inside — emit at the coarsest precision that fits.
-      // This gives big blocks in the interior, reducing cell count.
       result.push(hash)
-    } else if (hash.length >= maxPrecision) {
-      // At max precision — include any cell that overlaps the polygon.
+    } else if (hash.length >= edgeMaxPrecision) {
+      // At edge precision limit — include any cell that overlaps the polygon.
       result.push(hash)
     } else {
-      // Partially overlapping — classify children
-      const children = geohashChildren(hash)
-      const fullyInside: string[] = []
-      const partiallyOverlapping: string[] = []
-
-      for (const child of children) {
+      // Partially overlapping — subdivide. Fully-inside children are emitted
+      // immediately (coarse interior), partially-overlapping children continue.
+      for (const child of geohashChildren(hash)) {
         const cb = geohashBounds(child)
         if (boundsFullyInsidePolygon(cb, polygon)) {
-          fullyInside.push(child)
+          result.push(child)
         } else if (boundsOverlapsPolygon(cb, polygon)) {
-          partiallyOverlapping.push(child)
-        }
-      }
-
-      // Merge decision: only merge (keep parent) if we're at or past the
-      // edge minimum precision AND enough children are fully covered.
-      // This prevents coarse partially-overlapping cells from being kept
-      // as big blocks that stick outside the polygon.
-      const effectiveMinCount = Math.max(1, Math.ceil(coverageThreshold * 32))
-
-      if (hash.length >= edgeMinPrecision && fullyInside.length >= effectiveMinCount) {
-        // At sufficient depth with enough coverage — include at this precision
-        result.push(hash)
-      } else {
-        // Not enough coverage or not deep enough — subdivide
-        for (const child of fullyInside) {
-          queue.push(child)
-        }
-        for (const child of partiallyOverlapping) {
           queue.push(child)
         }
       }
