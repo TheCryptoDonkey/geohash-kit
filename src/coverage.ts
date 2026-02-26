@@ -162,7 +162,17 @@ export function polygonToGeohashes(
   polygon: [number, number][],
   options: CoverageOptions = {},
 ): string[] {
-  const { minPrecision = 1, maxPrecision = 9, maxCells = 500, mergeThreshold: rawThreshold = 1.0 } = options
+  // Guard: antimeridian-crossing polygons are not supported
+  for (let i = 0; i < polygon.length; i++) {
+    const j = (i + 1) % polygon.length
+    if (Math.abs(polygon[i][0] - polygon[j][0]) > 180) {
+      throw new Error('Polygons crossing the antimeridian (±180° longitude) are not supported')
+    }
+  }
+
+  const { minPrecision: rawMin = 1, maxPrecision: rawMax = 9, maxCells = 500, mergeThreshold: rawThreshold = 1.0 } = options
+  const minPrecision = Math.max(1, Math.min(9, Math.round(rawMin)))
+  const maxPrecision = Math.max(minPrecision, Math.min(9, Math.round(rawMax)))
   const threshold = Math.max(0, Math.min(1, rawThreshold))
 
   // Early bailout limit
@@ -205,12 +215,9 @@ function computeGeohashes(
     minPrecision + (maxPrecision - minPrecision) * coverageThreshold,
   )
 
-  // Seed: find all cells at minPrecision that overlap the polygon's bounding box
-  const seed = minPrecision <= 1
-    ? geohashChildren('')
-    : geohashChildren('').flatMap((c) => expandToDepth(c, minPrecision))
-
-  const queue = seed.filter((hash) => {
+  // Seed: precision-1 cells filtered by polygon overlap.
+  // BFS naturally subdivides into deeper precisions as needed.
+  const queue = geohashChildren('').filter((hash) => {
     const b = geohashBounds(hash)
     return boundsOverlapsPolygon(b, polygon)
   })
@@ -289,11 +296,6 @@ function mergeCompleteSiblings(hashes: string[], minPrecision: number): string[]
   }
 
   return Array.from(set)
-}
-
-function expandToDepth(hash: string, targetLength: number): string[] {
-  if (hash.length >= targetLength) return [hash]
-  return geohashChildren(hash).flatMap((c) => expandToDepth(c, targetLength))
 }
 
 // --- geohashesToConvexHull — reconstruct editable polygon ---

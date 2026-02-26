@@ -15,10 +15,24 @@ export interface GeohashBounds {
 
 export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 
+// --- Validation ---
+
+function validateGeohash(hash: string): void {
+  for (const ch of hash) {
+    if (!(ch in BASE32_DECODE)) {
+      throw new TypeError(`Invalid geohash character: '${ch}' in "${hash}"`)
+    }
+  }
+}
+
 // --- Encoding ---
 
 /** Encode latitude/longitude to a geohash string. Default precision 5 (~4.9km). */
 export function encode(lat: number, lon: number, precision = 5): string {
+  if (!Number.isFinite(precision)) throw new RangeError(`Invalid precision: ${precision}`)
+  precision = Math.round(precision)
+  if (precision < 1) throw new RangeError(`Invalid precision: ${precision}`)
+  precision = Math.min(12, precision)
   let latMin = -90, latMax = 90
   let lonMin = -180, lonMax = 180
   let hash = ''
@@ -56,6 +70,7 @@ export function decode(hash: string): { lat: number; lon: number; error: { lat: 
 
 /** Get the bounding rectangle of a geohash cell. */
 export function bounds(hash: string): GeohashBounds {
+  validateGeohash(hash)
   let minLat = -90, maxLat = 90
   let minLon = -180, maxLon = 180
   let isLon = true
@@ -78,6 +93,7 @@ export function bounds(hash: string): GeohashBounds {
 
 /** Get the 32 children of a geohash at the next precision level. */
 export function children(hash: string): string[] {
+  validateGeohash(hash)
   return Array.from(BASE32, (ch) => hash + ch)
 }
 

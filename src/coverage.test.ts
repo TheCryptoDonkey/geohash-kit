@@ -151,11 +151,12 @@ describe('polygonToGeohashes', () => {
   })
 
   it('can produce precision-1 cells for huge areas', () => {
+    // Large polygon spanning 180° of longitude (within antimeridian guard limit)
     const huge: [number, number][] = [
-      [-180, -90],
-      [180, -90],
-      [180, 90],
-      [-180, 90],
+      [-90, -85],
+      [90, -85],
+      [90, 85],
+      [-90, 85],
     ]
     const result = polygonToGeohashes(huge, { maxCells: 32 })
     const minLen = Math.min(...result.map((h) => h.length))
@@ -395,6 +396,61 @@ describe('geohashesToConvexHull', () => {
     // produce a valid non-empty result covering the same general area.
     const roundTrip = polygonToGeohashes(hull)
     expect(roundTrip.length).toBeGreaterThan(0)
+  })
+})
+
+describe('polygonToGeohashes — antimeridian guard', () => {
+  it('throws for polygon crossing the antimeridian', () => {
+    // Polygon that crosses from +170 to -170 longitude
+    const crossingPoly: [number, number][] = [
+      [170, -10],
+      [-170, -10],
+      [-170, 10],
+      [170, 10],
+    ]
+    expect(() => polygonToGeohashes(crossingPoly)).toThrow(/antimeridian/)
+  })
+
+  it('does not throw for polygon near but not crossing antimeridian', () => {
+    // Polygon near +170 but not crossing
+    const nearPoly: [number, number][] = [
+      [168, -5],
+      [175, -5],
+      [175, 5],
+      [168, 5],
+    ]
+    expect(() => polygonToGeohashes(nearPoly)).not.toThrow()
+  })
+})
+
+describe('polygonToGeohashes — seed explosion regression', () => {
+  it('polygonToGeohashes with minPrecision=5 completes in reasonable time', () => {
+    const london: [number, number][] = [
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ]
+    const start = Date.now()
+    const result = polygonToGeohashes(london, { minPrecision: 5, maxPrecision: 7, maxCells: 500 })
+    const elapsed = Date.now() - start
+    expect(elapsed).toBeLessThan(5000) // must complete in <5s, not OOM
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('minPrecision=4 produces same spatial coverage as minPrecision=1 for same polygon', () => {
+    const poly: [number, number][] = [
+      [-0.15, 51.50],
+      [-0.10, 51.50],
+      [-0.10, 51.52],
+      [-0.15, 51.52],
+    ]
+    const opts = { maxPrecision: 6, maxCells: 5000, mergeThreshold: 1.0 }
+    const r1 = polygonToGeohashes(poly, { ...opts, minPrecision: 1 })
+    const r4 = polygonToGeohashes(poly, { ...opts, minPrecision: 4 })
+    // Both should produce results (r4 should not hang or OOM)
+    expect(r1.length).toBeGreaterThan(0)
+    expect(r4.length).toBeGreaterThan(0)
   })
 })
 

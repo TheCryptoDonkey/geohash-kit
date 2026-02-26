@@ -7,6 +7,30 @@ import {
 } from './core.js'
 import { expandRings } from './nostr.js'
 
+describe('encode — input validation', () => {
+  it('throws RangeError for Infinity precision', () => {
+    expect(() => encode(51.5, -0.1, Infinity)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for NaN precision', () => {
+    expect(() => encode(51.5, -0.1, NaN)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for precision < 1', () => {
+    expect(() => encode(51.5, -0.1, 0)).toThrow(RangeError)
+    expect(() => encode(51.5, -0.1, -1)).toThrow(RangeError)
+  })
+
+  it('rounds float precision to nearest integer', () => {
+    expect(encode(51.5074, -0.1278, 4.7).length).toBe(5)
+    expect(encode(51.5074, -0.1278, 3.2).length).toBe(3)
+  })
+
+  it('clamps precision > 12 to 12', () => {
+    expect(encode(51.5074, -0.1278, 15).length).toBe(12)
+  })
+})
+
 describe('encode', () => {
   it('encodes London (51.5074, -0.1278) to gcpvj at precision 5', () => {
     expect(encode(51.5074, -0.1278, 5)).toBe('gcpvj')
@@ -31,6 +55,29 @@ describe('encode', () => {
   it('encodes extreme coordinates', () => {
     expect(encode(90, -180, 1)).toBe('b')
     expect(encode(-90, 180, 1)).toBe('p')
+  })
+})
+
+describe('geohash validation', () => {
+  it('throws TypeError for invalid characters (!@#)', () => {
+    expect(() => bounds('!!!')).toThrow(TypeError)
+    expect(() => bounds('abc@')).toThrow(TypeError)
+  })
+
+  it('throws TypeError for uppercase (GCPVJ)', () => {
+    expect(() => bounds('GCPVJ')).toThrow(TypeError)
+  })
+
+  it('throws TypeError for spaces', () => {
+    expect(() => bounds('gc pv')).toThrow(TypeError)
+  })
+
+  it('accepts all valid base32 characters', () => {
+    expect(() => bounds('0123456789bcdefghjkmnpqrstuvwxyz')).not.toThrow()
+  })
+
+  it('accepts empty string', () => {
+    expect(() => bounds('')).not.toThrow()
   })
 })
 

@@ -65,8 +65,8 @@ Nostr relays match `#g` tags by exact equality — there's no prefix matching. A
 ### Publishing
 
 ```typescript
-import { encode, createGTagLadder } from 'geohash-kit/nostr'
 import { encode } from 'geohash-kit/core'
+import { createGTagLadder } from 'geohash-kit/nostr'
 
 const hash = encode(51.5074, -0.1278, 6)
 const tags = createGTagLadder(hash)
@@ -145,10 +145,10 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 `polygonToGeohashes` uses adaptive threshold recursive subdivision:
 
 1. BFS from precision-1 cells that overlap the polygon
-2. For each cell: fully inside → include; at max precision → include if overlaps; partial → classify children
-3. Depth-dependent threshold: strict near root (avoids continent-sized cells), permissive near leaves (avoids edge slivers)
-4. If result exceeds `maxCells`, binary search tightens the threshold until under budget
-5. Result is sorted, deduplicated, multi-precision
+2. For each cell: fully inside → emit (if deep enough); at max precision → emit if overlaps; partial → subdivide children
+3. `mergeThreshold` controls interior cell granularity: 1.0 = uniform max precision, 0.0 = coarsest fully-inside cells
+4. If result exceeds `maxCells`, `maxPrecision` is stepped down until the result fits
+5. Post-processing merges complete sibling sets (all 32 children → parent). Result is sorted and deduplicated
 
 ## Comparison
 
