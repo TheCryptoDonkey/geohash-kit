@@ -28,3 +28,66 @@ export function bestGeohash(tags: string[][]): string | undefined {
   if (parsed.length === 0) return undefined
   return parsed.reduce((best, curr) => curr.precision > best.precision ? curr : best).geohash
 }
+
+// --- Ring expansion ---
+
+/** Expand geohash into concentric rings of neighbours. */
+export function expandRings(hash: string, rings = 1): string[][] {
+  const result: string[][] = [[hash]]
+  const seen = new Set([hash])
+
+  for (let ring = 1; ring <= rings; ring++) {
+    const prevRing = result[ring - 1]
+    const candidates = new Set<string>()
+    for (const cell of prevRing) {
+      const n = neighbours(cell)
+      for (const adj of Object.values(n)) {
+        if (!seen.has(adj)) {
+          candidates.add(adj)
+        }
+      }
+    }
+    const ringCells = Array.from(candidates)
+    for (const c of ringCells) seen.add(c)
+    result.push(ringCells)
+  }
+
+  return result
+}
+
+// --- Filter generation (subscribing) ---
+
+/** Generate a #g filter for Nostr REQ from coordinates and radius. */
+export function createGTagFilter(
+  lat: number,
+  lon: number,
+  radiusMetres: number,
+): { '#g': string[] } {
+  const precision = radiusToPrecision(radiusMetres)
+  const hash = encode(lat, lon, precision)
+
+  // Expand one ring to cover cell boundaries
+  const rings = expandRings(hash, 1)
+  const allHashes = rings.flat()
+
+  return { '#g': [...new Set(allHashes)] }
+}
+
+/** Generate a #g filter from an existing geohash set. */
+export function createGTagFilterFromGeohashes(hashes: string[]): { '#g': string[] } {
+  return { '#g': [...new Set(hashes)] }
+}
+
+/** Convenience: encode + expand rings + flatten to filter. */
+export function nearbyFilter(
+  lat: number,
+  lon: number,
+  options?: { precision?: number; rings?: number },
+): { '#g': string[] } {
+  const precision = options?.precision ?? 5
+  const ringCount = options?.rings ?? 1
+  const hash = encode(lat, lon, precision)
+  const rings = expandRings(hash, ringCount)
+  const allHashes = rings.flat()
+  return { '#g': [...new Set(allHashes)] }
+}

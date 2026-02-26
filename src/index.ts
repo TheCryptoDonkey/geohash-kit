@@ -11,3 +11,8 @@ export {
   deduplicateGeohashes,
   type CoverageOptions, type GeohashGeoJSON,
 } from './coverage.js'
+
+export {
+  createGTagLadder, createGTagFilter, createGTagFilterFromGeohashes,
+  expandRings, nearbyFilter, parseGTags, bestGeohash,
+} from './nostr.js'
