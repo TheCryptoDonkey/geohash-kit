@@ -157,6 +157,14 @@ export interface CoverageOptions {
  * Edges always subdivide to maxPrecision for a tight boundary. Interior
  * cells use the coarsest precision allowed by mergeThreshold. If the result
  * exceeds maxCells, maxPrecision is stepped down until it fits.
+ *
+ * Throws RangeError if the polygon cannot be covered within maxCells at
+ * the given minPrecision.
+ *
+ * **Antimeridian:** polygons crossing ±180° longitude are not supported.
+ * Hulls produced by `geohashesToConvexHull` for antimeridian-straddling
+ * hash sets will cross the dateline and cannot be used as input here.
+ * Split such polygons at the antimeridian and cover each half separately.
  */
 export function polygonToGeohashes(
   polygon: [number, number][],
@@ -176,6 +184,10 @@ export function polygonToGeohashes(
   }
 
   const { minPrecision: rawMin = 1, maxPrecision: rawMax = 9, maxCells = 500, mergeThreshold: rawThreshold = 1.0 } = options
+  if (!Number.isFinite(rawMin)) throw new RangeError(`Invalid minPrecision: ${rawMin}`)
+  if (!Number.isFinite(rawMax)) throw new RangeError(`Invalid maxPrecision: ${rawMax}`)
+  if (!Number.isFinite(maxCells) || maxCells < 1) throw new RangeError(`Invalid maxCells: ${maxCells}`)
+  if (!Number.isFinite(rawThreshold)) throw new RangeError(`Invalid mergeThreshold: ${rawThreshold}`)
   const minPrecision = Math.max(1, Math.min(9, Math.round(rawMin)))
   const maxPrecision = Math.max(minPrecision, Math.min(9, Math.round(rawMax)))
   const threshold = Math.max(0, Math.min(1, rawThreshold))
@@ -189,9 +201,14 @@ export function polygonToGeohashes(
     if (result !== null && result.length <= maxCells) return result
   }
 
-  // Fallback: minPrecision with threshold=0, then hard-cap to maxCells
+  // Fallback: minPrecision with threshold=0
   const fallback = computeGeohashes(polygon, minPrecision, minPrecision, 0) ?? []
-  return fallback.slice(0, maxCells)
+  if (fallback.length <= maxCells) return fallback
+
+  throw new RangeError(
+    `Polygon requires at least ${fallback.length} cells at precision ${minPrecision}, but maxCells is ${maxCells}. ` +
+    'Increase maxCells or reduce the polygon area.',
+  )
 }
 
 /**
@@ -331,6 +348,12 @@ function cross2D(o: [number, number], a: [number, number], b: [number, number]):
  * Collects all unique cell corners, then builds the hull using
  * Andrew's monotone chain algorithm.
  * Returns `[lon, lat][]`.
+ *
+ * **Antimeridian:** handles hashes straddling ±180° by normalising
+ * longitudes internally. The returned hull may contain coordinates on
+ * both sides of the dateline (e.g. `[179, …]` and `[-179, …]`).
+ * Such hulls cannot be passed directly to `polygonToGeohashes`, which
+ * rejects antimeridian-crossing polygons. Split at the antimeridian first.
  */
 export function geohashesToConvexHull(hashes: string[]): [number, number][] {
   if (hashes.length === 0) return []

@@ -127,16 +127,16 @@ describe('polygonToGeohashes', () => {
     expect(result.length).toBeLessThanOrEqual(50)
   })
 
-  it('enforces maxCells as a hard cap even on fallback path', () => {
-    // A polygon that produces multiple precision-1 cells — maxCells:1 must be honoured
+  it('throws RangeError when maxCells is infeasible', () => {
+    // This polygon needs at least 2 precision-1 cells — maxCells:1 is impossible
     const big: [number, number][] = [
       [-6.0, 49.0],
       [2.0, 49.0],
       [2.0, 56.0],
       [-6.0, 56.0],
     ]
-    const result = polygonToGeohashes(big, { maxCells: 1 })
-    expect(result.length).toBeLessThanOrEqual(1)
+    expect(() => polygonToGeohashes(big, { maxCells: 1 })).toThrow(RangeError)
+    expect(() => polygonToGeohashes(big, { maxCells: 1 })).toThrow(/Increase maxCells/)
   })
 
   it('returns empty array for tiny polygon outside valid area', () => {
@@ -445,6 +445,30 @@ describe('polygonToGeohashes — degenerate polygon guard', () => {
   it('does not throw for a 3-point polygon', () => {
     const triangle: [number, number][] = [[-0.1, 51.5], [0.1, 51.5], [0.0, 51.6]]
     expect(() => polygonToGeohashes(triangle)).not.toThrow()
+  })
+})
+
+describe('polygonToGeohashes — numeric options validation', () => {
+  const poly: [number, number][] = [[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52]]
+
+  it('throws RangeError for NaN minPrecision', () => {
+    expect(() => polygonToGeohashes(poly, { minPrecision: NaN })).toThrow(RangeError)
+  })
+
+  it('throws RangeError for NaN maxPrecision', () => {
+    expect(() => polygonToGeohashes(poly, { maxPrecision: NaN })).toThrow(RangeError)
+  })
+
+  it('throws RangeError for NaN maxCells', () => {
+    expect(() => polygonToGeohashes(poly, { maxCells: NaN })).toThrow(RangeError)
+  })
+
+  it('throws RangeError for NaN mergeThreshold', () => {
+    expect(() => polygonToGeohashes(poly, { mergeThreshold: NaN })).toThrow(RangeError)
+  })
+
+  it('throws RangeError for Infinity maxCells', () => {
+    expect(() => polygonToGeohashes(poly, { maxCells: Infinity })).toThrow(RangeError)
   })
 })
 
