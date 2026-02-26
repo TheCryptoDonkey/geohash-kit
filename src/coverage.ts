@@ -353,6 +353,18 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
 
   if (points.length < 3) return points
 
+  // Detect antimeridian straddling: points on both sides with a wide gap
+  const hasEast = points.some(p => p[0] > 90)
+  const hasWest = points.some(p => p[0] < -90)
+  const straddlesAntimeridian = hasEast && hasWest
+
+  // Shift negative longitudes to [180, 360] range to keep points contiguous
+  if (straddlesAntimeridian) {
+    for (const p of points) {
+      if (p[0] < 0) p[0] += 360
+    }
+  }
+
   // Sort by x then y
   points.sort((a, b) => a[0] - b[0] || a[1] - b[1])
 
@@ -379,7 +391,16 @@ export function geohashesToConvexHull(hashes: string[]): [number, number][] {
   lower.pop()
   upper.pop()
 
-  return [...lower, ...upper]
+  const hull = [...lower, ...upper]
+
+  // Shift longitudes back to [-180, 180] range
+  if (straddlesAntimeridian) {
+    for (const p of hull) {
+      if (p[0] > 180) p[0] -= 360
+    }
+  }
+
+  return hull
 }
 
 // --- deduplicateGeohashes ---

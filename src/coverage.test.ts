@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bounds, decode } from './core.js'
+import { bounds, decode, encode } from './core.js'
 import {
   pointInPolygon, boundsOverlapsPolygon, boundsFullyInsidePolygon,
   polygonToGeohashes, geohashesToGeoJSON, geohashesToConvexHull,
@@ -125,6 +125,18 @@ describe('polygonToGeohashes', () => {
     ]
     const result = polygonToGeohashes(big, { maxCells: 50 })
     expect(result.length).toBeLessThanOrEqual(50)
+  })
+
+  it('enforces maxCells as a hard cap even on fallback path', () => {
+    // A polygon that produces multiple precision-1 cells — maxCells:1 must be honoured
+    const big: [number, number][] = [
+      [-6.0, 49.0],
+      [2.0, 49.0],
+      [2.0, 56.0],
+      [-6.0, 56.0],
+    ]
+    const result = polygonToGeohashes(big, { maxCells: 1 })
+    expect(result.length).toBeLessThanOrEqual(1)
   })
 
   it('returns empty array for tiny polygon outside valid area', () => {
@@ -396,6 +408,43 @@ describe('geohashesToConvexHull', () => {
     // produce a valid non-empty result covering the same general area.
     const roundTrip = polygonToGeohashes(hull)
     expect(roundTrip.length).toBeGreaterThan(0)
+  })
+})
+
+describe('geohashesToConvexHull — antimeridian', () => {
+  it('produces a tight hull for hashes straddling the antimeridian', () => {
+    // Hashes on both sides of the antimeridian (+179 and -179)
+    const hashEast = encode(0, 179.5, 3)
+    const hashWest = encode(0, -179.5, 3)
+    const hull = geohashesToConvexHull([hashEast, hashWest])
+
+    // Hull should be tight (span < 30° of longitude around the antimeridian),
+    // NOT a globe-spanning hull (span ~359°).
+    // For antimeridian-crossing hulls, the planar span is ~360 minus the actual span.
+    const lons = hull.map((v) => v[0])
+    const planarSpan = Math.max(...lons) - Math.min(...lons)
+    const lonSpan = planarSpan > 180 ? 360 - planarSpan : planarSpan
+    expect(lonSpan).toBeLessThan(30)
+  })
+})
+
+describe('polygonToGeohashes — degenerate polygon guard', () => {
+  it('throws for a 2-point polygon', () => {
+    const line: [number, number][] = [[-0.1, 51.5], [0.1, 51.5]]
+    expect(() => polygonToGeohashes(line)).toThrow(/at least 3/)
+  })
+
+  it('throws for a 1-point polygon', () => {
+    expect(() => polygonToGeohashes([[0, 0]])).toThrow(/at least 3/)
+  })
+
+  it('throws for an empty polygon', () => {
+    expect(() => polygonToGeohashes([])).toThrow(/at least 3/)
+  })
+
+  it('does not throw for a 3-point polygon', () => {
+    const triangle: [number, number][] = [[-0.1, 51.5], [0.1, 51.5], [0.0, 51.6]]
+    expect(() => polygonToGeohashes(triangle)).not.toThrow()
   })
 })
 

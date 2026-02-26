@@ -29,6 +29,24 @@ describe('encode — input validation', () => {
   it('clamps precision > 12 to 12', () => {
     expect(encode(51.5074, -0.1278, 15).length).toBe(12)
   })
+
+  it('throws RangeError for NaN latitude', () => {
+    expect(() => encode(NaN, -0.1)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for Infinity longitude', () => {
+    expect(() => encode(51.5, Infinity)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for latitude out of range', () => {
+    expect(() => encode(91, 0)).toThrow(RangeError)
+    expect(() => encode(-91, 0)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for longitude out of range', () => {
+    expect(() => encode(0, 181)).toThrow(RangeError)
+    expect(() => encode(0, -181)).toThrow(RangeError)
+  })
 })
 
 describe('encode', () => {
@@ -270,6 +288,20 @@ describe('neighbours', () => {
   })
 })
 
+describe('distanceFromCoords — input validation', () => {
+  it('throws RangeError for NaN coordinate', () => {
+    expect(() => distanceFromCoords(NaN, 0, 0, 0)).toThrow(RangeError)
+    expect(() => distanceFromCoords(0, NaN, 0, 0)).toThrow(RangeError)
+    expect(() => distanceFromCoords(0, 0, NaN, 0)).toThrow(RangeError)
+    expect(() => distanceFromCoords(0, 0, 0, NaN)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for Infinity coordinate', () => {
+    expect(() => distanceFromCoords(Infinity, 0, 0, 0)).toThrow(RangeError)
+    expect(() => distanceFromCoords(0, 0, 0, -Infinity)).toThrow(RangeError)
+  })
+})
+
 describe('distanceFromCoords', () => {
   it('returns 0 for same point', () => {
     expect(distanceFromCoords(51.5074, -0.1278, 51.5074, -0.1278)).toBe(0)
@@ -305,6 +337,20 @@ describe('distance', () => {
     // Adjacent precision-5 cells should be within ~5km
     expect(d).toBeLessThan(10_000)
     expect(d).toBeGreaterThan(0)
+  })
+})
+
+describe('radiusToPrecision — input validation', () => {
+  it('throws RangeError for NaN', () => {
+    expect(() => radiusToPrecision(NaN)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for Infinity', () => {
+    expect(() => radiusToPrecision(Infinity)).toThrow(RangeError)
+  })
+
+  it('throws RangeError for negative radius', () => {
+    expect(() => radiusToPrecision(-100)).toThrow(RangeError)
   })
 })
 

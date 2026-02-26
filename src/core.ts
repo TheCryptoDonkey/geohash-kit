@@ -29,6 +29,8 @@ function validateGeohash(hash: string): void {
 
 /** Encode latitude/longitude to a geohash string. Default precision 5 (~4.9km). */
 export function encode(lat: number, lon: number, precision = 5): string {
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError(`Invalid latitude: ${lat}`)
+  if (!Number.isFinite(lon) || lon < -180 || lon > 180) throw new RangeError(`Invalid longitude: ${lon}`)
   if (!Number.isFinite(precision)) throw new RangeError(`Invalid precision: ${precision}`)
   precision = Math.round(precision)
   if (precision < 1) throw new RangeError(`Invalid precision: ${precision}`)
@@ -160,6 +162,9 @@ const EARTH_RADIUS_M = 6_371_000 // Earth mean radius in metres
 
 /** Haversine distance in metres between two coordinate pairs. */
 export function distanceFromCoords(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!Number.isFinite(lat1) || !Number.isFinite(lon1) || !Number.isFinite(lat2) || !Number.isFinite(lon2)) {
+    throw new RangeError('All coordinate arguments must be finite numbers')
+  }
   const toRad = (deg: number) => (deg * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
@@ -194,6 +199,7 @@ const PRECISION_RADIUS_M: number[] = [
 
 /** Optimal geohash precision for a given search radius in metres. */
 export function radiusToPrecision(metres: number): number {
+  if (!Number.isFinite(metres) || metres < 0) throw new RangeError(`Invalid radius: ${metres}`)
   for (let p = 1; p <= 9; p++) {
     if (PRECISION_RADIUS_M[p] <= metres) return p
   }
