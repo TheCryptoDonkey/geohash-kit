@@ -119,7 +119,7 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 
 | Function | Description |
 |----------|-------------|
-| `polygonToGeohashes(polygon, options?)` | Adaptive threshold polygon coverage |
+| `polygonToGeohashes(polygon, options?)` | Adaptive threshold polygon coverage; accepts `[lon, lat][]`, GeoJSON `Polygon`, or `MultiPolygon` |
 | `geohashesToGeoJSON(hashes)` | GeoJSON FeatureCollection for map rendering |
 | `geohashesToConvexHull(hashes)` | Convex hull reconstruction |
 | `deduplicateGeohashes(hashes, options?)` | Remove redundant ancestors; `{ lossy: true }` merges ≥30/32 siblings |
@@ -128,6 +128,8 @@ const all = parseGTags(event.tags)    // [{ geohash, precision }, ...]
 | `boundsFullyInsidePolygon(bounds, polygon)` | Bounds fully inside polygon test |
 
 **`CoverageOptions`:** `{ minPrecision?, maxPrecision?, maxCells?, mergeThreshold? }`
+
+**`PolygonInput`:** `[number, number][] | GeoJSONPolygon | GeoJSONMultiPolygon`
 
 ### `geohash-kit/nostr`
 

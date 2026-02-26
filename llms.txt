@@ -29,7 +29,7 @@ Basic geohash operations: encode, decode, bounds, neighbours, distance.
 ### geohash-kit/coverage
 Polygon-to-geohash coverage with adaptive threshold subdivision.
 
-- polygonToGeohashes(polygon, options?) → multi-precision hash set
+- polygonToGeohashes(polygon, options?) → multi-precision hash set (accepts [lon,lat][], GeoJSON Polygon, or MultiPolygon)
 - geohashesToGeoJSON(hashes) → GeoJSON FeatureCollection
 - geohashesToConvexHull(hashes) → polygon vertices
 - deduplicateGeohashes(hashes, options?) → ancestor-free set ({ lossy: true } for 30/32 merges)

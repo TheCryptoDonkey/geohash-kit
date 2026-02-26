@@ -54,6 +54,18 @@ interface GeohashGeoJSON {
     properties: { geohash: string; precision: number }
   }>
 }
+
+interface GeoJSONPolygon {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
+interface GeoJSONMultiPolygon {
+  type: 'MultiPolygon'
+  coordinates: number[][][][]
+}
+
+type PolygonInput = [number, number][] | GeoJSONPolygon | GeoJSONMultiPolygon
 ```
 
 ---
@@ -220,15 +232,30 @@ tightening to respect maxCells budget.
 
 ```typescript
 polygonToGeohashes(
-  polygon: [number, number][],   // [lon, lat] vertices
+  polygon: [number, number][] | GeoJSONPolygon | GeoJSONMultiPolygon,
   options?: CoverageOptions
 ): string[]
 
-// Cover central London
+// Cover central London (coordinate array)
 polygonToGeohashes([[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52]])
 
 // With options
 polygonToGeohashes(polygon, { maxCells: 100, mergeThreshold: 0.7 })
+
+// GeoJSON Polygon input
+polygonToGeohashes({
+  type: 'Polygon',
+  coordinates: [[[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52], [-0.15, 51.50]]]
+})
+
+// GeoJSON MultiPolygon input (results merged and deduplicated)
+polygonToGeohashes({
+  type: 'MultiPolygon',
+  coordinates: [
+    [[[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52], [-0.15, 51.50]]],
+    [[[-0.08, 51.50], [-0.03, 51.50], [-0.03, 51.52], [-0.08, 51.52], [-0.08, 51.50]]],
+  ]
+})
 ```
 
 ### geohashesToGeoJSON(hashes)
