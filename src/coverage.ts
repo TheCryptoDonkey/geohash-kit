@@ -274,7 +274,12 @@ function computeGeohashes(
     if (result.length > limit) return null
   }
 
-  return mergeCompleteSiblings(result, minPrecision).sort()
+  // Map coverageThreshold to merge aggressiveness:
+  // threshold 1.0 (tight) → require all 32 siblings (exact boundary)
+  // threshold 0.0 (loose) → require only 24 siblings (aggressive merge, fewer cells)
+  const minSiblings = Math.round(24 + coverageThreshold * 8)
+
+  return mergeCompleteSiblings(result, minPrecision, minSiblings).sort()
 }
 
 /**
