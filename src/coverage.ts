@@ -6,6 +6,7 @@ import type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojso
 
 // Re-export GeohashBounds for convenience
 export type { GeohashBounds } from './core.js'
+export type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojson.js'
 
 // --- Point-in-polygon (ray-casting) ---
 

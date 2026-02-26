@@ -10,6 +10,7 @@ export {
   polygonToGeohashes, geohashesToGeoJSON, geohashesToConvexHull,
   deduplicateGeohashes,
   type CoverageOptions, type DeduplicateOptions, type GeohashGeoJSON,
+  type PolygonInput, type GeoJSONPolygon, type GeoJSONMultiPolygon,
 } from './coverage.js'
 
 export {
