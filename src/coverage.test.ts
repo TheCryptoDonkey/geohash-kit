@@ -572,6 +572,35 @@ describe('polygonToGeohashes — GeoJSON input', () => {
     }
     expect(() => polygonToGeohashes(degenerate)).toThrow(/at least 3/)
   })
+
+  it('accepts a GeoJSON MultiPolygon and merges results', () => {
+    const multi = {
+      type: 'MultiPolygon' as const,
+      coordinates: [
+        // Polygon 1: central London
+        [[[-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52], [-0.15, 51.50]]],
+        // Polygon 2: slightly east
+        [[[-0.08, 51.50], [-0.03, 51.50], [-0.03, 51.52], [-0.08, 51.52], [-0.08, 51.50]]],
+      ],
+    }
+    const result = polygonToGeohashes(multi)
+    expect(result.length).toBeGreaterThan(0)
+    // No duplicates
+    expect(new Set(result).size).toBe(result.length)
+    // No ancestor/descendant pairs
+    const sorted = [...result].sort()
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        expect(sorted[j].startsWith(sorted[i]) && sorted[j].length > sorted[i].length).toBe(false)
+      }
+    }
+  })
+
+  it('MultiPolygon with empty coordinates array returns empty', () => {
+    const empty = { type: 'MultiPolygon' as const, coordinates: [] as number[][][][] }
+    const result = polygonToGeohashes(empty)
+    expect(result).toEqual([])
+  })
 })
 
 describe('deduplicateGeohashes', () => {
