@@ -44,7 +44,23 @@ export function boundsFullyInsidePolygon(
     [bounds.maxLon, bounds.maxLat],
     [bounds.minLon, bounds.maxLat],
   ]
-  return corners.every((c) => pointInPolygon(c, polygon))
+  if (!corners.every((c) => pointInPolygon(c, polygon))) return false
+
+  // For concave polygons, all corners can be inside while the polygon edge
+  // cuts through the cell. If any polygon edge intersects a cell edge, the
+  // cell is not fully inside.
+  const boundsEdges: [[number, number], [number, number]][] = [
+    [corners[0], corners[1]],
+    [corners[1], corners[2]],
+    [corners[2], corners[3]],
+    [corners[3], corners[0]],
+  ]
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    for (const be of boundsEdges) {
+      if (segmentsIntersect(be[0], be[1], polygon[j], polygon[i])) return false
+    }
+  }
+  return true
 }
 
 /**
