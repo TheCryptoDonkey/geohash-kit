@@ -525,6 +525,25 @@ describe('polygonToGeohashes — seed explosion regression', () => {
   })
 })
 
+describe('polygonToGeohashes — GeoJSON input', () => {
+  // A simple rectangle around central London as [lon, lat][]
+  const coordPolygon: [number, number][] = [
+    [-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52],
+  ]
+
+  it('accepts a GeoJSON Polygon and produces same result as coordinate array', () => {
+    const geojsonPolygon = {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [-0.15, 51.50], [-0.10, 51.50], [-0.10, 51.52], [-0.15, 51.52], [-0.15, 51.50],
+      ]],
+    }
+    const fromCoords = polygonToGeohashes(coordPolygon)
+    const fromGeoJSON = polygonToGeohashes(geojsonPolygon)
+    expect(fromGeoJSON).toEqual(fromCoords)
+  })
+})
+
 describe('deduplicateGeohashes', () => {
   it('removes children when parent is present', () => {
     const result = deduplicateGeohashes(['gcp', 'gcpvj', 'gcpvm', 'u10'])

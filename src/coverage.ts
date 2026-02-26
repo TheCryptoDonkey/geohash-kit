@@ -2,6 +2,7 @@
 
 import { bounds as geohashBounds, children as geohashChildren } from './core.js'
 import type { GeohashBounds } from './core.js'
+import type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojson.js'
 
 // Re-export GeohashBounds for convenience
 export type { GeohashBounds } from './core.js'
@@ -151,6 +152,33 @@ export interface CoverageOptions {
 }
 
 /**
+ * Normalise a PolygonInput to a [lon, lat][] coordinate array.
+ * - `[number, number][]` → returned as-is
+ * - GeoJSON Polygon → outer ring extracted (closing vertex stripped if present)
+ * - GeoJSON MultiPolygon → not handled here (caller processes each polygon separately)
+ */
+function normalisePolygonInput(input: PolygonInput): [number, number][] {
+  if (Array.isArray(input)) {
+    return input
+  }
+  if (input.type === 'Polygon') {
+    const ring = input.coordinates[0]
+    if (!ring || ring.length === 0) {
+      throw new Error('GeoJSON Polygon has no outer ring')
+    }
+    // Strip closing vertex if it duplicates the first
+    const coords = ring as [number, number][]
+    if (coords.length > 1 &&
+        coords[0][0] === coords[coords.length - 1][0] &&
+        coords[0][1] === coords[coords.length - 1][1]) {
+      return coords.slice(0, -1)
+    }
+    return coords
+  }
+  throw new Error(`Unsupported input type: ${(input as { type: string }).type}`)
+}
+
+/**
  * Convert a polygon (array of [lon, lat] vertices) to an efficient set of
  * multi-precision geohash strings using recursive subdivision.
  *
@@ -165,9 +193,21 @@ export interface CoverageOptions {
  * Split at the antimeridian and cover each half separately.
  */
 export function polygonToGeohashes(
-  polygon: [number, number][],
+  input: PolygonInput,
   options: CoverageOptions = {},
 ): string[] {
+  // Handle MultiPolygon: process each polygon, merge and deduplicate
+  if (!Array.isArray(input) && input.type === 'MultiPolygon') {
+    const allHashes: string[] = []
+    for (const polyCoords of input.coordinates) {
+      const singlePolygon: GeoJSONPolygon = { type: 'Polygon', coordinates: polyCoords }
+      allHashes.push(...polygonToGeohashes(singlePolygon, options))
+    }
+    return deduplicateGeohashes(allHashes)
+  }
+
+  const polygon = normalisePolygonInput(input)
+
   // Guard: degenerate polygons
   if (polygon.length < 3) {
     throw new Error('Polygon must have at least 3 vertices')
