@@ -254,3 +254,8 @@ See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-
 ## Support
 
 For issues and feature requests, see [GitHub Issues](https://github.com/TheCryptoDonkey/geohash-kit/issues).
+
+If you find geohash-kit useful, consider sending a tip:
+
+- **Lightning:** `thedonkey@strike.me`
+- **Nostr zaps:** `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
