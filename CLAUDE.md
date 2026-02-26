@@ -64,3 +64,4 @@ git push origin main
 - Semantic-release creates version commits and tags automatically
 - No manual version management needed — never edit version numbers
 - GitHub Actions uses Trusted Publishing (OIDC) — no npm tokens required
+- Repository must be **public** for provenance signing to work with npm
