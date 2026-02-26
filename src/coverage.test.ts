@@ -139,14 +139,13 @@ describe('polygonToGeohashes', () => {
     expect(() => polygonToGeohashes(big, { maxCells: 1 })).toThrow(/Increase maxCells/)
   })
 
-  it('returns empty array for tiny polygon outside valid area', () => {
+  it('throws RangeError for polygon with coordinates outside valid geographic bounds', () => {
     const nowhere: [number, number][] = [
       [200, 100],
       [201, 100],
       [201, 101],
     ]
-    const result = polygonToGeohashes(nowhere)
-    expect(result).toEqual([])
+    expect(() => polygonToGeohashes(nowhere)).toThrow(RangeError)
   })
 
   it('defaults to minPrecision 1 and maxPrecision 9', () => {

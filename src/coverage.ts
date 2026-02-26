@@ -8,6 +8,18 @@ import type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojso
 export type { GeohashBounds } from './core.js'
 export type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojson.js'
 
+// --- Validation ---
+
+const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+
+function validateGeohash(hash: string): void {
+  for (const ch of hash) {
+    if (!BASE32.includes(ch)) {
+      throw new TypeError(`Invalid geohash character: '${ch}' in "${hash}"`)
+    }
+  }
+}
+
 // --- Point-in-polygon (ray-casting) ---
 
 /**
@@ -292,6 +304,26 @@ export function polygonToGeohashes(
     }
   }
 
+  // Guard: all coordinates must be within valid geographic bounds
+  for (const [lon, lat] of polygon) {
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      throw new RangeError(`Invalid latitude in polygon: ${lat}`)
+    }
+    if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+      throw new RangeError(`Invalid longitude in polygon: ${lon}`)
+    }
+  }
+  for (const hole of holes) {
+    for (const [lon, lat] of hole) {
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+        throw new RangeError(`Invalid latitude in hole: ${lat}`)
+      }
+      if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+        throw new RangeError(`Invalid longitude in hole: ${lon}`)
+      }
+    }
+  }
+
   // Early bailout limit
   const bailout = maxCells * 4
 
@@ -570,6 +602,9 @@ export interface DeduplicateOptions {
  *    near-complete (≥30/32) when `lossy: true`.
  */
 export function deduplicateGeohashes(hashes: string[], options: DeduplicateOptions = {}): string[] {
+  // Validate all input hashes
+  for (const h of hashes) validateGeohash(h)
+
   // Step 1: remove children when ancestor is present
   const set = new Set(hashes)
   const filtered = Array.from(set).filter((h) => {
