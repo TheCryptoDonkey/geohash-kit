@@ -10,6 +10,7 @@ import {
 
 // --- Map setup ---
 const map = L.map('map').setView([51.5074, -0.1278], 12)
+window._map = map  // Expose for demo video recording
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
