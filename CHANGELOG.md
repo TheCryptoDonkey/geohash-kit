@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/TheCryptoDonkey/geohash-kit/compare/v1.4.0...v1.4.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* normalise repository URL in package.json ([a1ebe66](https://github.com/TheCryptoDonkey/geohash-kit/commit/a1ebe6660f617149c6cd0d84927d9a66fd2d1215))
+
 # [1.4.0](https://github.com/TheCryptoDonkey/geohash-kit/compare/v1.3.0...v1.4.0) (2026-03-05)
 
 
