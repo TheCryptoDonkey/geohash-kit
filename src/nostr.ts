@@ -1,18 +1,7 @@
 // geohash-kit/nostr — Nostr g-tag utilities
 
 import { encode, neighbours, radiusToPrecision } from './core.js'
-
-// --- Validation ---
-
-const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
-
-function isValidGeohash(hash: string): boolean {
-  if (hash.length === 0) return false
-  for (const ch of hash) {
-    if (!BASE32.includes(ch)) return false
-  }
-  return true
-}
+import { isValidGeohash } from './base32.js'
 
 // --- Publishing (event tags) ---
 

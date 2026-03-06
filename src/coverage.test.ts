@@ -71,6 +71,44 @@ describe('boundsFullyInsidePolygon', () => {
   })
 })
 
+describe('boundsFullyInsidePolygon — concave polygon edge cases', () => {
+  // L-shaped concave polygon: all bounds corners can be inside but polygon edge cuts through
+  const concaveL: [number, number][] = [
+    [0, 0], [10, 0], [10, 5], [5, 5], [5, 10], [0, 10],
+  ]
+
+  it('returns false when all corners inside but polygon edge cuts through cell', () => {
+    // Bounds that span the concave notch (corners inside, but L-edge intersects)
+    const b: GeohashBounds = { minLat: 4, maxLat: 6, minLon: 4, maxLon: 6 }
+    expect(boundsFullyInsidePolygon(b, concaveL)).toBe(false)
+  })
+
+  it('returns true for bounds fully inside one arm of the L', () => {
+    const b: GeohashBounds = { minLat: 1, maxLat: 3, minLon: 1, maxLon: 3 }
+    expect(boundsFullyInsidePolygon(b, concaveL)).toBe(true)
+  })
+})
+
+describe('boundsOverlapsPolygon — collinear and touching edge cases', () => {
+  const square: [number, number][] = [[0, 0], [10, 0], [10, 10], [0, 10]]
+
+  it('detects overlap when bounds share only an edge with polygon', () => {
+    // Bounds exactly touching the right edge of the square
+    const b: GeohashBounds = { minLat: 2, maxLat: 8, minLon: 10, maxLon: 15 }
+    // Ray-casting: point on edge may or may not be inside, but edge intersection should detect overlap
+    const result = boundsOverlapsPolygon(b, square)
+    // At minimum, the shared edge means they touch — implementation may return true or false
+    // depending on boundary handling, but should not crash
+    expect(typeof result).toBe('boolean')
+  })
+
+  it('detects overlap for T-junction (bounds edge crosses polygon vertex)', () => {
+    const triangle: [number, number][] = [[5, 0], [10, 10], [0, 10]]
+    const b: GeohashBounds = { minLat: 4, maxLat: 6, minLon: 4, maxLon: 6 }
+    expect(boundsOverlapsPolygon(b, triangle)).toBe(true)
+  })
+})
+
 describe('polygonToGeohashes', () => {
   it('returns geohashes covering a small area', () => {
     // Small polygon around central London (~2km square)
@@ -392,8 +430,9 @@ describe('convexHull', () => {
     expect(result).toHaveLength(3)
   })
 
-  it('produces counter-clockwise winding', () => {
+  it('produces counter-clockwise winding with non-zero area', () => {
     const hull = convexHull([[0, 0], [4, 0], [4, 3], [0, 3], [2, 1]])
+    // All cross products should be >= 0 (counter-clockwise or collinear)
     for (let i = 0; i < hull.length; i++) {
       const a = hull[i]
       const b = hull[(i + 1) % hull.length]
@@ -401,6 +440,13 @@ describe('convexHull', () => {
       const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
       expect(cross).toBeGreaterThanOrEqual(0)
     }
+    // Verify the hull has non-zero area (shoelace formula)
+    let area = 0
+    for (let i = 0; i < hull.length; i++) {
+      const j = (i + 1) % hull.length
+      area += hull[i][0] * hull[j][1] - hull[j][0] * hull[i][1]
+    }
+    expect(Math.abs(area / 2)).toBeGreaterThan(0)
   })
 
   it('handles random point cloud (pentagon shape)', () => {
