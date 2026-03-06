@@ -25,6 +25,9 @@ Basic geohash operations: encode, decode, bounds, neighbours, distance.
 - matchesAny(hash, candidates) → boolean
 - distance(hashA, hashB) → metres
 - distanceFromCoords(lat1, lon1, lat2, lon2) → metres
+- midpoint(hashA, hashB) → { lat, lon }
+- midpointFromCoords(lat1, lon1, lat2, lon2) → { lat, lon }
+- midpointFromCoordsMulti(points) → { lat, lon } (spherical vector mean)
 - radiusToPrecision(metres) → precision level (1-9)
 - precisionToRadius(precision) → metres
 
@@ -34,6 +37,7 @@ Polygon-to-geohash coverage with adaptive threshold subdivision.
 - polygonToGeohashes(polygon, options?) → multi-precision hash set (accepts [lon,lat][], GeoJSON Polygon, or MultiPolygon)
 - geohashesToGeoJSON(hashes) → GeoJSON FeatureCollection
 - geohashesToConvexHull(hashes) → polygon vertices
+- convexHull(points) → [x, y][] (Andrew's monotone chain, counter-clockwise winding)
 - deduplicateGeohashes(hashes, options?) → ancestor-free set ({ lossy: true } for 30/32 merges)
 - pointInPolygon(point, polygon) → boolean
 - boundsOverlapsPolygon(bounds, polygon) → boolean

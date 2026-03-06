@@ -8,17 +8,7 @@ import type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojso
 export type { GeohashBounds } from './core.js'
 export type { PolygonInput, GeoJSONPolygon, GeoJSONMultiPolygon } from './geojson.js'
 
-// --- Validation ---
-
-const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
-
-function validateGeohash(hash: string): void {
-  for (const ch of hash) {
-    if (!BASE32.includes(ch)) {
-      throw new TypeError(`Invalid geohash character: '${ch}' in "${hash}"`)
-    }
-  }
-}
+import { validateGeohash } from './base32.js'
 
 // --- Point-in-polygon (ray-casting) ---
 

@@ -182,6 +182,41 @@ distanceFromCoords(lat1: number, lon1: number, lat2: number, lon2: number): numb
 distanceFromCoords(51.5074, -0.1278, 48.8566, 2.3522)  // ~340000
 ```
 
+### midpointFromCoords(lat1, lon1, lat2, lon2)
+
+Geographic midpoint between two coordinate pairs (spherical interpolation via Cartesian averaging).
+
+```typescript
+midpointFromCoords(lat1: number, lon1: number, lat2: number, lon2: number): { lat: number; lon: number }
+
+midpointFromCoords(51.5074, -0.1278, 48.8566, 2.3522)  // ~{ lat: 50.19, lon: 1.11 }
+midpointFromCoords(0, 170, 0, -170)                      // ~{ lat: 0, lon: 180 } (antimeridian)
+```
+
+### midpointFromCoordsMulti(points)
+
+Geographic centroid of N coordinate pairs (spherical vector mean).
+
+```typescript
+midpointFromCoordsMulti(points: ReadonlyArray<{ lat: number; lon: number }>): { lat: number; lon: number }
+
+midpointFromCoordsMulti([
+  { lat: 51.5074, lon: -0.1278 },
+  { lat: 53.4808, lon: -2.2426 },
+  { lat: 55.9533, lon: -3.1883 },
+])  // ~{ lat: 53.5, lon: -1.9 }
+```
+
+### midpoint(hashA, hashB)
+
+Geographic midpoint between centres of two geohash cells.
+
+```typescript
+midpoint(hashA: string, hashB: string): { lat: number; lon: number }
+
+midpoint('gcpvj', 'u09tu')  // ~{ lat: 50.2, lon: 1.1 } (London ↔ Paris)
+```
+
 ### radiusToPrecision(metres)
 
 Optimal geohash precision for a given search radius in metres.
@@ -279,6 +314,20 @@ geohashesToConvexHull(hashes: string[]): [number, number][]
 
 const hull = geohashesToConvexHull(['gcpvj', 'gcpvm', 'gcpvn'])
 // [[lon, lat], [lon, lat], ...] — convex hull vertices
+```
+
+### convexHull(points)
+
+Compute the convex hull of a set of `[x, y]` points using Andrew's monotone chain algorithm. O(n log n). Returns hull vertices in counter-clockwise winding order. Handles edge cases: empty input, single point, two points, collinear points, and duplicates.
+
+```typescript
+convexHull(input: [number, number][]): [number, number][]
+
+convexHull([[0, 0], [4, 0], [4, 3], [0, 3], [2, 1]])
+// [[0, 0], [4, 0], [4, 3], [0, 3]]  (interior point excluded)
+
+convexHull([[0, 0], [1, 1], [2, 2]])
+// [[0, 0], [2, 2]]  (collinear → endpoints only)
 ```
 
 ### deduplicateGeohashes(hashes, options?)

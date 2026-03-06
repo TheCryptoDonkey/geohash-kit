@@ -1,8 +1,6 @@
 // geohash-kit/core — encode, decode, bounds, children, contains, matchesAny
 
-const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz'
-const BASE32_DECODE: Record<string, number> = {}
-for (let i = 0; i < BASE32.length; i++) BASE32_DECODE[BASE32[i]] = i
+import { BASE32, BASE32_DECODE, validateGeohash } from './base32.js'
 
 // --- Types ---
 
@@ -14,16 +12,6 @@ export interface GeohashBounds {
 }
 
 export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
-
-// --- Validation ---
-
-function validateGeohash(hash: string): void {
-  for (const ch of hash) {
-    if (!(ch in BASE32_DECODE)) {
-      throw new TypeError(`Invalid geohash character: '${ch}' in "${hash}"`)
-    }
-  }
-}
 
 // --- Encoding ---
 

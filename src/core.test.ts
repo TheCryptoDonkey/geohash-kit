@@ -75,6 +75,20 @@ describe('encode', () => {
     expect(encode(90, -180, 1)).toBe('b')
     expect(encode(-90, 180, 1)).toBe('p')
   })
+
+  it('produces precision-12 geohash', () => {
+    const h = encode(51.5074, -0.1278, 12)
+    expect(h.length).toBe(12)
+    expect(h.startsWith('gcpvj')).toBe(true)
+  })
+
+  it('matches external reference values', () => {
+    // Reference values verified against geohash.org
+    expect(encode(57.6499, 10.4065, 5)).toBe('u4pru') // Aalborg, Denmark
+    expect(encode(-33.8688, 151.2093, 5)).toBe('r3gx2') // Sydney, Australia
+    expect(encode(35.6762, 139.6503, 5)).toBe('xn76c') // Tokyo, Japan
+    expect(encode(40.7128, -74.006, 5)).toBe('dr5re') // New York, USA
+  })
 })
 
 describe('geohash validation', () => {
@@ -169,6 +183,18 @@ describe('children', () => {
   it('children are unique', () => {
     const c = children('gc')
     expect(new Set(c).size).toBe(32)
+  })
+
+  it('each child bounds is contained within parent bounds', () => {
+    const parent = 'gcpvj'
+    const parentBounds = bounds(parent)
+    for (const child of children(parent)) {
+      const cb = bounds(child)
+      expect(cb.minLat).toBeGreaterThanOrEqual(parentBounds.minLat)
+      expect(cb.maxLat).toBeLessThanOrEqual(parentBounds.maxLat)
+      expect(cb.minLon).toBeGreaterThanOrEqual(parentBounds.minLon)
+      expect(cb.maxLon).toBeLessThanOrEqual(parentBounds.maxLon)
+    }
   })
 
   it('returns 32 top-level geohashes for empty string', () => {
@@ -308,10 +334,11 @@ describe('distanceFromCoords', () => {
     expect(distanceFromCoords(51.5074, -0.1278, 51.5074, -0.1278)).toBe(0)
   })
 
-  it('calculates London to Paris (~340km)', () => {
+  it('calculates London to Paris (~343.5km)', () => {
+    // Reference: Haversine great-circle distance ≈ 343,556m
     const d = distanceFromCoords(51.5074, -0.1278, 48.8566, 2.3522)
-    expect(d).toBeGreaterThan(330_000)
-    expect(d).toBeLessThan(350_000)
+    expect(d).toBeGreaterThan(340_000)
+    expect(d).toBeLessThan(347_000)
   })
 
   it('calculates equator distance (1 degree ~111km)', () => {
@@ -700,6 +727,36 @@ describe('fuzz: pole boundary behaviour', () => {
         // Latitude should stay within valid range
         expect(b.minLat).toBeGreaterThanOrEqual(-90)
         expect(b.maxLat).toBeLessThanOrEqual(90)
+      })
+    }
+  }
+})
+
+describe('fuzz: pole + antimeridian combo', () => {
+  const POLE_AM_CASES = [
+    { name: 'north pole + antimeridian (east)', lat: 89.9, lon: 179.9 },
+    { name: 'north pole + antimeridian (west)', lat: 89.9, lon: -179.9 },
+    { name: 'south pole + antimeridian (east)', lat: -89.9, lon: 179.9 },
+    { name: 'south pole + antimeridian (west)', lat: -89.9, lon: -179.9 },
+  ]
+
+  for (const { name, lat, lon } of POLE_AM_CASES) {
+    for (let precision = 1; precision <= 5; precision++) {
+      it(`${name} at precision ${precision}: all neighbours valid`, () => {
+        const hash = encode(lat, lon, precision)
+        const nbrs = neighbours(hash)
+
+        for (const nb of Object.values(nbrs)) {
+          expect(nb.length).toBe(precision)
+          // Must produce valid bounds
+          const b = bounds(nb)
+          expect(b.minLat).toBeGreaterThanOrEqual(-90)
+          expect(b.maxLat).toBeLessThanOrEqual(90)
+          expect(b.minLon).toBeGreaterThanOrEqual(-180)
+          expect(b.maxLon).toBeLessThanOrEqual(180)
+          expect(b.minLat).toBeLessThan(b.maxLat)
+          expect(b.minLon).toBeLessThan(b.maxLon)
+        }
       })
     }
   }
