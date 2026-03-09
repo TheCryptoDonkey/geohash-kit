@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/TheCryptoDonkey/geohash-kit/compare/v1.4.2...v1.5.0) (2026-03-09)
+
+
+### Features
+
+* add android compatibility vectors and CI check ([fe6a015](https://github.com/TheCryptoDonkey/geohash-kit/commit/fe6a0153f9ad54f8206631f08f3e72136355c8bb))
+
 ## [1.4.2](https://github.com/TheCryptoDonkey/geohash-kit/compare/v1.4.1...v1.4.2) (2026-03-06)
 
 
