@@ -28,7 +28,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "vectors:check": "node ./scripts/check-vectors.mjs"
   },
   "keywords": [
     "geohash",

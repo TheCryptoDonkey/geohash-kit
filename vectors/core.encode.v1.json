@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "module": "core",
+  "function": "encode",
+  "description": "Deterministic encode outputs for shared cross-language conformance tests.",
+  "cases": [
+    {
+      "id": "london-p5",
+      "input": {
+        "lat": 51.5074,
+        "lon": -0.1278,
+        "precision": 5
+      },
+      "expected": "gcpvj"
+    },
+    {
+      "id": "sydney-p6",
+      "input": {
+        "lat": -33.8688,
+        "lon": 151.2093,
+        "precision": 6
+      },
+      "expected": "r3gx2f"
+    },
+    {
+      "id": "equator-antimeridian-east",
+      "input": {
+        "lat": 0,
+        "lon": 179.9999,
+        "precision": 6
+      },
+      "expected": "xbpbpb"
+    }
+  ]
+}

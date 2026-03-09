@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "module": "core",
+  "function": "neighbours",
+  "description": "Neighbour outputs, including antimeridian wrapping behavior.",
+  "cases": [
+    {
+      "id": "gcpvj",
+      "input": "gcpvj",
+      "expected": {
+        "n": "gcpvm",
+        "ne": "gcpvq",
+        "e": "gcpvn",
+        "se": "gcpuy",
+        "s": "gcpuv",
+        "sw": "gcpuu",
+        "w": "gcpvh",
+        "nw": "gcpvk"
+      }
+    },
+    {
+      "id": "xbpb",
+      "input": "xbpb",
+      "expected": {
+        "n": "xbpc",
+        "ne": "8001",
+        "e": "8000",
+        "se": "2pbp",
+        "s": "rzzz",
+        "sw": "rzzx",
+        "w": "xbp8",
+        "nw": "xbp9"
+      }
+    }
+  ]
+}

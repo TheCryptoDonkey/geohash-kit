@@ -244,6 +244,14 @@ Performance summary:
 
 For detailed performance analysis, device comparisons, and optimization guidance, see [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
 
+## Android Compatibility
+
+For Kotlin/Android parity implementations, use the compatibility contract and versioned vectors:
+
+- [docs/android-compat.md](./docs/android-compat.md)
+- [vectors/schema.json](./vectors/schema.json)
+- `npm run vectors:check` (run after `npm run build`)
+
 ## For AI Assistants
 
 See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-full.txt) for the complete reference with examples.

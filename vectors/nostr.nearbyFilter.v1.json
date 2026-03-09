@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "module": "nostr",
+  "function": "nearbyFilter",
+  "description": "Nearby filter outputs for fixed precision and ring settings.",
+  "cases": [
+    {
+      "id": "london-p5-r1",
+      "input": {
+        "lat": 51.5074,
+        "lon": -0.1278,
+        "options": {
+          "precision": 5,
+          "rings": 1
+        }
+      },
+      "expected": {
+        "#g": [
+          "gcpvj",
+          "gcpvm",
+          "gcpvq",
+          "gcpvn",
+          "gcpuy",
+          "gcpuv",
+          "gcpuu",
+          "gcpvh",
+          "gcpvk"
+        ]
+      }
+    },
+    {
+      "id": "london-p4-r2",
+      "input": {
+        "lat": 51.5074,
+        "lon": -0.1278,
+        "options": {
+          "precision": 4,
+          "rings": 2
+        }
+      },
+      "expected": {
+        "#g": [
+          "gcpv",
+          "gcpy",
+          "u10n",
+          "u10j",
+          "u10h",
+          "gcpu",
+          "gcps",
+          "gcpt",
+          "gcpw",
+          "gcpz",
+          "u10p",
+          "gcpx",
+          "u10r",
+          "u10q",
+          "u10m",
+          "u10k",
+          "u107",
+          "u105",
+          "gcpg",
+          "gcpe",
+          "gcp7",
+          "gcpk",
+          "gcpm",
+          "gcpq",
+          "gcpr"
+        ]
+      }
+    }
+  ]
+}
