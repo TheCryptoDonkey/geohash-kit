@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TheCryptoDonkey/geohash-kit/blob/main/vectors/schema.json",
+  "title": "geohash-kit compatibility vector file",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "module",
+    "function",
+    "cases"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "module": {
+      "type": "string",
+      "enum": [
+        "core",
+        "nostr"
+      ]
+    },
+    "function": {
+      "type": "string",
+      "enum": [
+        "encode",
+        "decode",
+        "neighbours",
+        "createGTagLadder",
+        "nearbyFilter"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "input",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {},
+        "expected": {},
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

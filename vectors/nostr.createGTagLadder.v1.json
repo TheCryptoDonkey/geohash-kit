@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "module": "nostr",
+  "function": "createGTagLadder",
+  "description": "Nostr g-tag ladder vectors, including a Roadstr-compatible min precision case.",
+  "cases": [
+    {
+      "id": "full-ladder",
+      "input": {
+        "geohash": "gcpvj",
+        "minPrecision": 1
+      },
+      "expected": [
+        [
+          "g",
+          "g"
+        ],
+        [
+          "g",
+          "gc"
+        ],
+        [
+          "g",
+          "gcp"
+        ],
+        [
+          "g",
+          "gcpv"
+        ],
+        [
+          "g",
+          "gcpvj"
+        ]
+      ]
+    },
+    {
+      "id": "roadstr-range",
+      "input": {
+        "geohash": "u2edcg",
+        "minPrecision": 4
+      },
+      "expected": [
+        [
+          "g",
+          "u2ed"
+        ],
+        [
+          "g",
+          "u2edc"
+        ],
+        [
+          "g",
+          "u2edcg"
+        ]
+      ]
+    }
+  ]
+}

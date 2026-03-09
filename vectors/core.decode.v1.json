@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "module": "core",
+  "function": "decode",
+  "description": "Decode vectors with exact center/error values for parity checks.",
+  "cases": [
+    {
+      "id": "gcpvj",
+      "input": "gcpvj",
+      "expected": {
+        "lat": 51.52587890625,
+        "lon": -0.10986328125,
+        "error": {
+          "lat": 0.02197265625,
+          "lon": 0.02197265625
+        }
+      }
+    },
+    {
+      "id": "u4pruydqqvj",
+      "input": "u4pruydqqvj",
+      "expected": {
+        "lat": 57.64911063015461,
+        "lon": 10.407439693808556,
+        "error": {
+          "lat": 6.705522537231445e-7,
+          "lon": 6.705522537231445e-7
+        }
+      }
+    }
+  ]
+}
