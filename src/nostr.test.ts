@@ -166,6 +166,10 @@ describe('createGTagFilterFromGeohashes', () => {
     const filter = createGTagFilterFromGeohashes(['gcpvj', 'gcpvj', 'gcpvm'])
     expect(filter['#g']).toEqual(['gcpvj', 'gcpvm'])
   })
+
+  it('throws TypeError for invalid geohash characters', () => {
+    expect(() => createGTagFilterFromGeohashes(['gcpvj', 'INVALID'])).toThrow(TypeError)
+  })
 })
 
 describe('nearbyFilter', () => {
