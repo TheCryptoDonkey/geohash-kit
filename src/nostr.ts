@@ -83,6 +83,7 @@ export function createGTagFilter(
 
 /** Generate a #g filter from an existing geohash set. */
 export function createGTagFilterFromGeohashes(hashes: string[]): { '#g': string[] } {
+  for (const h of hashes) validateGeohash(h)
   return { '#g': [...new Set(hashes)] }
 }
 
